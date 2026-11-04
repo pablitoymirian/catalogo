@@ -26,6 +26,8 @@ header{position:sticky;top:0;z-index:20;background:var(--head);color:#fff;box-sh
 .top img{width:40px;height:40px;flex:none}
 .top .t{flex:1;min-width:0}.top b{display:block;font-family:var(--f-display);font-size:16px;line-height:1.2}
 .top small{color:var(--sky);font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top .t+a{margin-left:auto}
+@media (max-width:560px){.top{flex-wrap:wrap}.top .t{flex-basis:calc(100% - 52px)}.top a,.top button{font-size:12px;padding:5px 10px}}
 .top a,.top button{color:#fff;font:700 13px var(--f-body);background:none;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:6px 12px;text-decoration:none;cursor:pointer;white-space:nowrap}
 .demo{background:#FFF4D6;color:#5C4400;font-size:13px;border-bottom:1px solid #EBD9A4}
 .demo .wrap{padding-block:8px}
@@ -91,6 +93,7 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
     <img src="logo-blanco.png" alt="Distribuidora Pablito y Mirian">
     <div class="t"><b>Administrador del catálogo</b><small id="who">Pablito y Mirian</small></div>
     <a href="./" target="_blank" rel="noopener">Ver catálogo</a>
+    <button id="miclave" type="button" hidden>Cambiar contraseña</button>
     <button id="salir" type="button" hidden>Salir</button>
   </div>
 </header>
@@ -395,7 +398,7 @@ async function esAdmin() {
   if (error) throw error; return !!data;
 }
 async function entrarAlPanel() {
-  $('who').textContent = MODO_PRUEBA ? 'Modo prueba' : user.email; $('salir').hidden = MODO_PRUEBA;
+  $('who').textContent = MODO_PRUEBA ? 'Modo prueba' : user.email; $('salir').hidden = MODO_PRUEBA; $('miclave').hidden = MODO_PRUEBA;
   if (!MODO_PRUEBA && !(await esAdmin())) { $('noEmail').textContent = user.email; ver('vNo'); return; }
   ver('vPanel'); await cargarTodo();
 }
@@ -426,6 +429,7 @@ $('lOlvide').onclick = async () => {
 $('fClave').onsubmit = async (e) => { e.preventDefault(); const { error } = await sb.auth.updateUser({ password: $('nPass').value }); if (error) { $('nMsg').className = 'msg err'; $('nMsg').textContent = traducir(error); } else { toast('Contraseña cambiada.'); entrarAlPanel(); } };
 $('noRe').onclick = () => entrarAlPanel().catch((e) => toast(traducir(e)));
 $('salir').onclick = async () => { await sb.auth.signOut(); };
+$('miclave').onclick = () => { $('nPass').value = ''; $('nMsg').textContent = ''; ver('vClave'); };
 
 async function arrancar() {
   if (MODO_PRUEBA) { $('demo').hidden = false; await entrarAlPanel(); return; }
@@ -434,7 +438,7 @@ async function arrancar() {
   sb.auth.onAuthStateChange((ev, session) => {
     if (ev === 'PASSWORD_RECOVERY') { user = session.user; ver('vClave'); return; }
     if (session?.user) { user = session.user; if (!enPanel) { enPanel = true; setTimeout(() => entrarAlPanel().catch((e) => toast(traducir(e))), 0); } }
-    else { user = null; enPanel = false; $('salir').hidden = true; $('who').textContent = 'Pablito y Mirian'; ver('vLogin'); }
+    else { user = null; enPanel = false; $('salir').hidden = true; $('miclave').hidden = true; $('who').textContent = 'Pablito y Mirian'; ver('vLogin'); }
   });
 }
 arrancar().catch((e) => { console.error(e); toast(traducir(e)); });
