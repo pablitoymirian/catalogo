@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Administrador del catálogo</title>
+<link rel="icon" href="logo-azul-marino.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
+<style>
+:root{
+  --navy:#1C2B4F; --navy-2:#2F4A7A; --ink:#111B33; --muted:#4A5568; --sky:#8EC5E8; --sky-2:#E8F3FB;
+  --bg:#F6F8FB; --card:#FFFFFF; --line:#D9E4F0; --ok:#1F8F4E; --warn:#B4531F; --head:#1C2B4F;
+  --f-display:"Poppins","Segoe UI",Arial,sans-serif; --f-body:"Nunito Sans","Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ink:#E8EEF7; --muted:#A9B6CA; --bg:#0E1526; --card:#16213A; --line:#26355A; --sky-2:#1A2848; --head:#111B33; --navy:#9CC8EC; --navy-2:#8EC5E8; color-scheme:dark}}
+:root[data-theme="dark"]{--ink:#E8EEF7; --muted:#A9B6CA; --bg:#0E1526; --card:#16213A; --line:#26355A; --sky-2:#1A2848; --head:#111B33; --navy:#9CC8EC; --navy-2:#8EC5E8; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{position:sticky;top:0;z-index:20;background:var(--head);color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.top{display:flex;align-items:center;gap:12px;padding-block:10px}
+.top img{width:40px;height:40px;flex:none}
+.top .t{flex:1;min-width:0}.top b{display:block;font-family:var(--f-display);font-size:16px;line-height:1.2}
+.top small{color:var(--sky);font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top a,.top button{color:#fff;font:700 13px var(--f-body);background:none;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:6px 12px;text-decoration:none;cursor:pointer;white-space:nowrap}
+.demo{background:#FFF4D6;color:#5C4400;font-size:13px;border-bottom:1px solid #EBD9A4}
+.demo .wrap{padding-block:8px}
+main{padding-block:16px 60px}
+h1,h2{font-family:var(--f-display);color:var(--navy);margin:0 0 10px}
+h1{font-size:21px}h2{font-size:18px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.login{max-width:400px;margin:30px auto}
+label.f{display:block;font-weight:700;font-size:13px;margin:12px 0 5px}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=search],select{width:100%;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);color:var(--ink)}
+input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outline-offset:1px}
+.btn{border:0;border-radius:10px;font:700 14.5px var(--f-body);cursor:pointer;padding:10px 14px}
+.pri{background:#1C2B4F;color:#fff}
+.sec{background:var(--sky-2);color:var(--navy);border:1px solid var(--line)}
+.dan{background:none;color:var(--warn);border:1px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:default}
+.link{background:none;border:0;color:var(--navy-2);font:700 13.5px var(--f-body);text-decoration:underline;cursor:pointer;padding:0}
+.msg{font-size:13.5px;margin-top:10px;color:var(--muted)}.msg.err{color:var(--warn);font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.stat b{display:block;font-family:var(--f-display);font-size:20px;color:var(--navy);font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--muted)}
+.stat[aria-pressed="true"]{border-color:var(--navy-2);background:var(--sky-2)}
+.tools{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:8px;margin-bottom:10px}
+.acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:12px}
+.acts .count{font-weight:700;color:var(--navy)}
+.acts div{display:flex;gap:8px;flex-wrap:wrap}
+.list{display:flex;flex-direction:column;gap:8px}
+.row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;cursor:pointer;text-align:left;font:inherit;color:inherit;width:100%}
+.row:hover{border-color:var(--sky)}
+.pic{aspect-ratio:1;background-color:#fff;background-repeat:no-repeat;border-radius:8px;border:1px solid var(--line);position:relative}
+.pic.sinfoto{background:var(--sky-2)}
+.row .n{font-weight:700;font-size:14px;line-height:1.25}
+.row .d{font-size:12.5px;color:var(--muted)}
+.row .p{font-family:var(--f-display);font-weight:700;color:var(--navy);white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:1px 6px;margin-right:4px;background:var(--sky-2);color:var(--navy)}
+.tag.oc{background:#FBE9DF;color:#8A3A10}.tag.il{background:#EEF1F5;color:#4A5568}.tag.nu{background:#DDF3E6;color:#145C33}
+.more{display:block;margin:14px auto 0}
+.sheet{position:fixed;inset:0;z-index:40;background:rgba(10,16,32,.55);display:flex;align-items:flex-end;justify-content:center}
+.panel{background:var(--card);color:var(--ink);width:100%;max-width:620px;max-height:94%;border-radius:18px 18px 0 0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (min-width:700px){.sheet{align-items:center}.panel{border-radius:18px}}
+.ph{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.ph h2{margin:0}
+.x{background:none;border:0;font-size:28px;line-height:1;color:var(--muted);cursor:pointer}
+.pb{overflow:auto;padding:4px 16px 16px}
+.fotoed{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;align-items:center;margin-top:12px}
+.fotoed .pic{width:150px}
+.fotoed div.b{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chk{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.chk input{margin-top:4px;width:18px;height:18px;accent-color:#1C2B4F}
+.orig{font-size:12px;color:var(--muted);margin-top:4px}
+.pf{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px 16px;border-top:1px solid var(--line)}
+.pf .pri{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:#111B33;color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;z-index:60;max-width:calc(100% - 32px);text-align:center}
+.help{font-size:13px;color:var(--muted);margin:0 0 14px}
+@media (max-width:640px){.tools{grid-template-columns:1fr 1fr}.tools #q{grid-column:1/-1}.fotoed{grid-template-columns:110px minmax(0,1fr)}.fotoed .pic{width:110px}.two{grid-template-columns:1fr}.row{grid-template-columns:52px minmax(0,1fr)}.row .p{grid-column:2;text-align:left}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <img src="logo-blanco.png" alt="Distribuidora Pablito y Mirian">
+    <div class="t"><b>Administrador del catálogo</b><small id="who">Pablito y Mirian</small></div>
+    <a href="./" target="_blank" rel="noopener">Ver catálogo</a>
+    <button id="salir" type="button" hidden>Salir</button>
+  </div>
+</header>
+<div class="demo" id="demo" hidden><div class="wrap"><b>Modo prueba.</b> Todavía no está conectado a la base de datos: los cambios se guardan solo en este navegador y no los ve nadie más.</div></div>
+
+<main class="wrap">
+  <!-- Entrar -->
+  <section id="vLogin" class="box login" hidden>
+    <h1>Entrar</h1>
+    <p class="help">Solo para el equipo de Pablito y Mirian.</p>
+    <form id="fLogin">
+      <label class="f" for="lEmail">Correo</label><input id="lEmail" type="email" autocomplete="username" required>
+      <label class="f" for="lPass">Contraseña</label><input id="lPass" type="password" autocomplete="current-password" required minlength="6">
+      <div id="lNombreW" hidden><label class="f" for="lNombre">Tu nombre</label><input id="lNombre" type="text" autocomplete="name"></div>
+      <button class="btn pri" style="width:100%;margin-top:16px" id="lBtn" type="submit">Entrar</button>
+    </form>
+    <div style="display:flex;justify-content:space-between;margin-top:12px;gap:10px;flex-wrap:wrap">
+      <button class="link" id="lModo" type="button">Crear cuenta</button>
+      <button class="link" id="lOlvide" type="button">Olvidé mi contraseña</button>
+    </div>
+    <div class="msg" id="lMsg"></div>
+  </section>
+
+  <!-- Sin permiso -->
+  <section id="vNo" class="box login" hidden>
+    <h1>Falta habilitar tu cuenta</h1>
+    <p>Tu cuenta (<b id="noEmail"></b>) existe, pero todavía no tiene permiso de administrador del catálogo. Pasale este correo a quien administra el catálogo para que te habilite.</p>
+    <button class="btn sec" id="noRe" type="button">Ya me habilitaron</button>
+  </section>
+
+  <!-- Nueva contraseña -->
+  <section id="vClave" class="box login" hidden>
+    <h1>Nueva contraseña</h1>
+    <form id="fClave"><label class="f" for="nPass">Escribí tu nueva contraseña</label><input id="nPass" type="password" minlength="6" required autocomplete="new-password">
+    <button class="btn pri" style="width:100%;margin-top:16px" type="submit">Guardar</button></form>
+    <div class="msg" id="nMsg"></div>
+  </section>
+
+  <!-- Panel -->
+  <section id="vPanel" hidden>
+    <div class="stats" id="stats"></div>
+    <div class="tools">
+      <input id="q" type="search" placeholder="Buscar por nombre, marca o código" autocomplete="off" aria-label="Buscar">
+      <select id="fs" aria-label="Sección"></select>
+      <select id="fr" aria-label="Rubro"></select>
+    </div>
+    <div class="acts">
+      <span class="count" id="count">Cargando…</span>
+      <div>
+        <button class="btn sec" id="csv" type="button">Descargar cambios (Excel)</button>
+        <button class="btn pri" id="nuevo" type="button">+ Agregar producto</button>
+      </div>
+    </div>
+    <div class="list" id="list"></div>
+    <button class="btn sec more" id="more" type="button" hidden>Ver más</button>
+  </section>
+</main>
+
+<!-- Editar -->
+<div class="sheet" id="sheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="eT">
+    <div class="ph"><h2 id="eT">Editar producto</h2><button class="x" id="eX" type="button" aria-label="Cerrar">×</button></div>
+    <form class="pb" id="fEd">
+      <div class="fotoed">
+        <div class="pic" id="ePic"></div>
+        <div class="b">
+          <label class="btn sec" for="eFile" style="display:inline-block">Cambiar foto</label>
+          <input id="eFile" type="file" accept="image/*" hidden>
+          <button class="link" id="eFotoQuitar" type="button" hidden>Volver a la foto anterior</button>
+          <span class="orig" id="eFotoTxt"></span>
+        </div>
+      </div>
+      <div id="eCodW" hidden><label class="f" for="eCod">Código interno (el del sistema)</label><input id="eCod" type="text" inputmode="numeric"></div>
+      <div id="eCodTxt" class="orig" style="margin-top:12px"></div>
+      <label class="f" for="eN">Nombre</label><input id="eN" type="text" required maxlength="160">
+      <div class="orig" id="eNo"></div>
+      <div class="two">
+        <div><label class="f" for="eP">Precio minorista (Gs.)</label><input id="eP" type="number" min="0" step="1" inputmode="numeric"><div class="orig" id="ePo"></div></div>
+        <div><label class="f" for="eM">Marca</label><input id="eM" type="text" list="dlM" maxlength="80"><datalist id="dlM"></datalist></div>
+      </div>
+      <div class="two">
+        <div><label class="f" for="eS">Sección</label><select id="eS"></select><input id="eS2" type="text" placeholder="Nombre de la sección nueva" maxlength="60" hidden style="margin-top:6px"></div>
+        <div><label class="f" for="eR">Rubro</label><input id="eR" type="text" list="dlR" maxlength="60"><datalist id="dlR"></datalist></div>
+      </div>
+      <label class="chk"><input id="eOc" type="checkbox"><span><b>Ocultar del catálogo</b><br><span class="orig">Para productos que ya no se venden o que no querés mostrar. Se puede volver a mostrar cuando quieras.</span></span></label>
+    </form>
+    <div class="pf">
+      <button class="btn pri" id="eSave" type="button">Guardar</button>
+      <button class="btn dan" id="eReset" type="button" hidden>Deshacer mis cambios</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="datos.js"></script>
+<script>
+const PAGE = 50;
+let sb = null, user = null, CAMBIOS = new Map(), P = [], BYID = new Map(), st = { q: '', s: '', r: '', f: '', shown: PAGE }, ed = null, fotoNueva = null, quitarFoto = false, modoLogin = 'entrar';
+
+function toast(t) { const e = $('toast'); e.textContent = t; e.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (e.hidden = true), 3000); }
+function ver(id) { ['vLogin', 'vNo', 'vClave', 'vPanel'].forEach((v) => ($(v).hidden = v !== id)); }
+function traducir(e) {
+  const m = String(e?.message || e || '');
+  if (/Invalid login/i.test(m)) return 'Correo o contraseña incorrectos.';
+  if (/already registered|already exists/i.test(m)) return 'Ya hay una cuenta con ese correo. Probá entrar.';
+  if (/Password should be/i.test(m)) return 'La contraseña tiene que tener al menos 6 caracteres.';
+  if (/rate limit|too many/i.test(m)) return 'Demasiados intentos. Esperá un minuto y probá de nuevo.';
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'No hay conexión. Revisá internet y probá de nuevo.';
+  if (/row-level security|permission denied|42501/i.test(m)) return 'Tu cuenta no tiene permiso para guardar cambios.';
+  if (/duplicate key/i.test(m)) return 'Ya existe un producto con ese código.';
+  return m;
+}
+
+/* ---------- Guardado (base de datos o modo prueba) ---------- */
+const Guardar = {
+  async upsert(row) {
+    if (MODO_PRUEBA) { const all = load('pym_cat_cambios_prueba', {}); all[row.cod] = { ...row, actualizado: new Date().toISOString(), actualizado_por: 'prueba' }; store('pym_cat_cambios_prueba', all); return all[row.cod]; }
+    const { data, error } = await sb.from('catalogo_cambios').upsert(row).select().single();
+    if (error) throw error; return data;
+  },
+  async borrar(cod) {
+    if (MODO_PRUEBA) { const all = load('pym_cat_cambios_prueba', {}); delete all[cod]; store('pym_cat_cambios_prueba', all); return; }
+    const { error } = await sb.from('catalogo_cambios').delete().eq('cod', cod); if (error) throw error;
+  },
+  async foto(cod, blob) {
+    if (MODO_PRUEBA) return await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+    const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
+    const path = `fotos/${slug(cod) || 'producto'}-${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from(CONFIG.BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false });
+    if (error) throw error;
+    return sb.storage.from(CONFIG.BUCKET).getPublicUrl(path).data.publicUrl;
+  },
+};
+
+/* Achica la foto en el celular antes de subirla (máx. 800 px) */
+async function achicar(file, max) {
+  const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('No se pudo abrir esa imagen.')); i.src = URL.createObjectURL(file); });
+  const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+  let b = await new Promise((ok) => c.toBlob(ok, 'image/webp', 0.82));
+  if (!b || b.type !== 'image/webp') b = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.85));
+  return b;
+}
+
+/* ---------- Datos ---------- */
+async function cargarTodo() {
+  $('count').textContent = 'Cargando productos…';
+  if (!D) await cargarBase();
+  const cs = await leerCambios();
+  CAMBIOS = new Map(cs.map((c) => [String(c.cod), c]));
+  P = aplicarCambios(cs).filter((p) => p.n || p.nuevo);
+  BYID = new Map(P.map((p) => [p.id, p]));
+  armarFiltros(); render();
+}
+const FILTROS = [
+  ['', 'Todos los productos', () => true],
+  ['il', 'Con imagen ilustrativa', (p) => p.il && !p.f],
+  ['ft', 'Con foto cargada', (p) => !!p.f],
+  ['ed', 'Editados', (p) => !!p.cambio && !p.nuevo],
+  ['nu', 'Agregados', (p) => p.nuevo],
+  ['oc', 'Ocultos', (p) => p.oc],
+];
+function armarFiltros() {
+  const secs = ordenarSecciones(P);
+  $('fs').innerHTML = '<option value="">Todas las secciones</option>' + secs.map((s) => `<option>${esc(s)}</option>`).join('');
+  $('fs').value = secs.includes(st.s) ? st.s : (st.s = '');
+  armarRubros();
+  $('stats').innerHTML = FILTROS.map(([k, lab, fn]) => `<button class="stat" type="button" data-f="${k}" aria-pressed="${st.f === k}"><b>${P.filter(fn).length.toLocaleString('es-PY')}</b><span>${lab}</span></button>`).join('');
+  $('stats').querySelectorAll('.stat').forEach((b) => (b.onclick = () => { st.f = b.dataset.f; st.shown = PAGE; armarFiltros(); render(); }));
+  $('dlM').innerHTML = [...new Set(P.map((p) => p.m).filter(Boolean))].sort().map((m) => `<option value="${esc(m)}">`).join('');
+}
+function armarRubros() {
+  const rs = [...new Set(P.filter((p) => !st.s || p.s === st.s).map((p) => p.r))].sort((a, b) => a.localeCompare(b, 'es'));
+  $('fr').innerHTML = '<option value="">Todos los rubros</option>' + rs.map((r) => `<option>${esc(r)}</option>`).join('');
+  $('fr').value = rs.includes(st.r) ? st.r : (st.r = '');
+}
+function filtrados() {
+  const fn = FILTROS.find((f) => f[0] === st.f)[2]; const words = nz(st.q).split(/\s+/).filter(Boolean);
+  let ps = P.filter((p) => fn(p) && (!st.s || p.s === st.s) && (!st.r || p.r === st.r) && words.every((w) => p.q.includes(w)));
+  if (st.f === 'ed' || st.f === 'nu' || st.f === 'ft') ps.sort((a, b) => String(b.cambio?.actualizado || '').localeCompare(String(a.cambio?.actualizado || '')));
+  else ps.sort((a, b) => a.n.localeCompare(b.n, 'es'));
+  return ps;
+}
+function render() {
+  const ps = filtrados(); const L = $('list'); L.innerHTML = '';
+  $('count').textContent = `${ps.length.toLocaleString('es-PY')} productos`;
+  if (!ps.length) L.innerHTML = '<div class="box" style="text-align:center;color:var(--muted)">No hay productos con ese filtro.</div>';
+  const fr = document.createDocumentFragment();
+  ps.slice(0, st.shown).forEach((p) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
+    const tags = (p.oc ? '<span class="tag oc">Oculto</span>' : '') + (p.nuevo ? '<span class="tag nu">Agregado</span>' : p.cambio ? '<span class="tag">Editado</span>' : '') + (p.il && !p.f ? '<span class="tag il">Imagen ilustrativa</span>' : '');
+    b.innerHTML = `<div class="pic"></div><div style="min-width:0"><div class="n"></div><div class="d">Cód. ${esc(p.id)} · ${esc(p.s)} › ${esc(p.r)}${p.m ? ' · ' + esc(p.m) : ''}</div><div>${tags}</div></div><div class="p">${p.p > 0 ? gs(p.p) : 'Sin precio'}</div>`;
+    b.querySelector('.n').textContent = p.n || '(sin nombre)'; pic(b.firstChild, p); b.onclick = () => abrir(p); fr.appendChild(b);
+  });
+  L.appendChild(fr);
+  $('more').hidden = ps.length <= st.shown; $('more').textContent = `Ver más (${(ps.length - Math.min(ps.length, st.shown)).toLocaleString('es-PY')} restantes)`;
+}
+
+/* ---------- Editar ---------- */
+function opcionesSeccion(actual) {
+  const secs = ordenarSecciones(P); if (actual && !secs.includes(actual)) secs.push(actual);
+  $('eS').innerHTML = secs.map((s) => `<option>${esc(s)}</option>`).join('') + '<option value="__nueva">+ Sección nueva…</option>';
+  $('eS').value = actual || secs[0]; $('eS2').hidden = true; $('eS2').value = '';
+  rubrosDe($('eS').value);
+}
+function rubrosDe(s) { $('dlR').innerHTML = [...new Set(P.filter((p) => p.s === s).map((p) => p.r))].sort().map((r) => `<option value="${esc(r)}">`).join(''); }
+function abrir(p) {
+  ed = p; fotoNueva = null; quitarFoto = false; $('eFile').value = '';
+  const nuevo = !p; const o = p ? ORIG.get(p.id) : null;
+  $('eT').textContent = nuevo ? 'Agregar producto' : 'Editar producto';
+  $('eCodW').hidden = !nuevo; $('eCod').value = ''; $('eCodTxt').textContent = nuevo ? '' : `Código interno: ${p.id}`; $('eCodTxt').hidden = nuevo;
+  $('eN').value = p ? p.n : ''; $('eP').value = p && p.p ? p.p : ''; $('eM').value = p ? p.m : '';
+  opcionesSeccion(p ? p.s : (st.s || 'Otros productos')); $('eR').value = p ? p.r : (st.r || '');
+  $('eOc').checked = !!(p && p.oc);
+  $('eNo').textContent = o && o.n !== p.n ? `En el sistema: ${o.n}` : '';
+  $('ePo').textContent = o && o.p !== p.p ? `En el sistema: ${gs(o.p)}` : '';
+  $('eReset').hidden = !(p && p.cambio); $('eReset').textContent = p && p.nuevo ? 'Borrar producto' : 'Deshacer mis cambios';
+  mostrarFoto();
+  $('sheet').hidden = false; setTimeout(() => (nuevo ? $('eCod') : $('eN')).focus(), 50);
+}
+function mostrarFoto() {
+  const el = $('ePic'); el.innerHTML = '';
+  const tieneCargada = ed && ed.cambio && ed.cambio.foto_url && !quitarFoto;
+  if (fotoNueva) { el.classList.remove('sinfoto'); el.style.backgroundImage = `url("${fotoNueva.url}")`; el.style.backgroundSize = 'contain'; el.style.backgroundPosition = 'center'; }
+  else if (ed) { const base = ORIG.get(ed.id); pic(el, tieneCargada ? ed : base ? { ...base } : { i: -1 }); }
+  else { pic(el, { i: -1 }); }
+  $('eFotoTxt').textContent = fotoNueva ? 'Foto nueva: se sube al tocar Guardar.' : tieneCargada ? 'Foto cargada por el equipo.' : ed && ed.il ? 'Ahora tiene una imagen ilustrativa.' : ed && ed.i >= 0 ? 'Foto buscada en internet.' : 'Sin foto.';
+  $('eFotoQuitar').hidden = !(fotoNueva || tieneCargada);
+  $('eFotoQuitar').textContent = fotoNueva ? 'Descartar foto nueva' : 'Sacar la foto cargada';
+}
+$('eFile').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const blob = await achicar(f, 800); fotoNueva = { blob, url: URL.createObjectURL(blob) }; quitarFoto = false; mostrarFoto(); }
+  catch (err) { toast(traducir(err)); }
+};
+$('eFotoQuitar').onclick = () => { if (fotoNueva) fotoNueva = null; else quitarFoto = true; $('eFile').value = ''; mostrarFoto(); };
+$('eS').onchange = () => { const nueva = $('eS').value === '__nueva'; $('eS2').hidden = !nueva; if (nueva) $('eS2').focus(); else rubrosDe($('eS').value); };
+function cerrar() { $('sheet').hidden = true; ed = null; fotoNueva = null; }
+$('eX').onclick = cerrar; $('sheet').onclick = (e) => { if (e.target.id === 'sheet') cerrar(); };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('sheet').hidden) cerrar(); });
+
+$('eSave').onclick = async () => {
+  const nuevo = !ed;
+  const cod = nuevo ? $('eCod').value.trim() : ed.id;
+  const nombre = $('eN').value.trim();
+  const precio = $('eP').value === '' ? null : Math.round(Number($('eP').value));
+  const seccion = $('eS').value === '__nueva' ? $('eS2').value.trim() : $('eS').value;
+  const rubro = $('eR').value.trim(); const marca = $('eM').value.trim(); const oculto = $('eOc').checked;
+  if (nuevo && !cod) { toast('Poné el código interno del producto.'); $('eCod').focus(); return; }
+  if (nuevo && (ORIG.has(cod) || CAMBIOS.has(cod))) { toast('Ya existe un producto con ese código. Buscalo y editalo.'); return; }
+  if (!nombre) { toast('Poné el nombre del producto.'); $('eN').focus(); return; }
+  if (!seccion) { toast('Elegí o escribí la sección.'); return; }
+  if (!rubro) { toast('Escribí el rubro (por ejemplo: Labios, Coloración).'); $('eR').focus(); return; }
+  const o = nuevo ? null : ORIG.get(cod); const prev = nuevo ? null : CAMBIOS.get(cod);
+  const dif = (v, base) => (o && v === base ? null : v);
+  const row = {
+    cod, nuevo: nuevo || !!(prev && prev.nuevo),
+    nombre: dif(nombre, o?.n), precio: dif(precio, o?.p), seccion: dif(seccion, o?.s), rubro: dif(rubro, o?.r), marca: dif(marca, o?.m || ''),
+    oculto, foto_url: quitarFoto ? null : (prev?.foto_url || null),
+  };
+  if (row.nuevo) Object.assign(row, { nombre, precio, seccion, rubro, marca });
+  const btn = $('eSave'); btn.disabled = true; btn.textContent = fotoNueva ? 'Subiendo foto…' : 'Guardando…';
+  try {
+    if (fotoNueva) row.foto_url = await Guardar.foto(cod, fotoNueva.blob);
+    const vacio = !row.nuevo && !row.oculto && !row.foto_url && ['nombre', 'precio', 'seccion', 'rubro', 'marca'].every((k) => row[k] == null);
+    if (vacio) { if (prev) await Guardar.borrar(cod); } else await Guardar.upsert(row);
+    cerrar(); await cargarTodo(); toast('Guardado. Ya se ve así en el catálogo.');
+  } catch (err) { toast(traducir(err)); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar'; }
+};
+$('eReset').onclick = async () => {
+  if (!ed) return;
+  const txt = ed.nuevo ? '¿Borrar este producto agregado?' : '¿Volver este producto a como está en el sistema? Se pierden el nombre, precio, foto y sección que cambiaste.';
+  if (!confirm(txt)) return;
+  try { await Guardar.borrar(ed.id); cerrar(); await cargarTodo(); toast('Listo, quedó como estaba.'); } catch (err) { toast(traducir(err)); }
+};
+$('nuevo').onclick = () => abrir(null);
+
+/* Lista de cambios para pasar al sistema (Excel abre el CSV) */
+$('csv').onclick = () => {
+  const cs = [...CAMBIOS.values()].sort((a, b) => String(b.actualizado || '').localeCompare(String(a.actualizado || '')));
+  if (!cs.length) { toast('Todavía no hay cambios.'); return; }
+  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const head = ['Código interno', 'Tipo', 'Nombre en el sistema', 'Nombre nuevo', 'Precio en el sistema', 'Precio nuevo', 'Sección', 'Rubro', 'Marca', 'Oculto', 'Foto cargada', 'Fecha', 'Quién'];
+  const rows = cs.map((c) => { const o = ORIG.get(String(c.cod)); return [c.cod, c.nuevo ? 'Agregado' : 'Editado', o?.n || '', c.nombre || '', o?.p ?? '', c.precio ?? '', c.seccion || '', c.rubro || '', c.marca || '', c.oculto ? 'Sí' : '', c.foto_url ? 'Sí' : '', (c.actualizado || '').slice(0, 16).replace('T', ' '), c.actualizado_por || '']; });
+  const csv = '﻿' + [head, ...rows].map((r) => r.map(q).join(';')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `PyM_cambios_catalogo_${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(a); a.click(); a.remove();
+};
+
+let qt; $('q').addEventListener('input', (e) => { clearTimeout(qt); qt = setTimeout(() => { st.q = e.target.value.trim(); st.shown = PAGE; render(); }, 200); });
+$('fs').onchange = (e) => { st.s = e.target.value; st.r = ''; st.shown = PAGE; armarRubros(); render(); };
+$('fr').onchange = (e) => { st.r = e.target.value; st.shown = PAGE; render(); };
+$('more').onclick = () => { st.shown += PAGE; render(); };
+
+/* ---------- Cuenta ---------- */
+async function esAdmin() {
+  const { data, error } = await sb.from('catalogo_admins').select('user_id').eq('user_id', user.id).maybeSingle();
+  if (error) throw error; return !!data;
+}
+async function entrarAlPanel() {
+  $('who').textContent = MODO_PRUEBA ? 'Modo prueba' : user.email; $('salir').hidden = MODO_PRUEBA;
+  if (!MODO_PRUEBA && !(await esAdmin())) { $('noEmail').textContent = user.email; ver('vNo'); return; }
+  ver('vPanel'); await cargarTodo();
+}
+$('lModo').onclick = () => { modoLogin = modoLogin === 'entrar' ? 'crear' : 'entrar'; const c = modoLogin === 'crear';
+  $('lNombreW').hidden = !c; $('lBtn').textContent = c ? 'Crear cuenta' : 'Entrar'; $('lModo').textContent = c ? 'Ya tengo cuenta' : 'Crear cuenta';
+  $('vLogin').querySelector('h1').textContent = c ? 'Crear cuenta' : 'Entrar'; $('lPass').autocomplete = c ? 'new-password' : 'current-password'; $('lMsg').textContent = ''; };
+$('fLogin').onsubmit = async (e) => {
+  e.preventDefault(); const m = $('lMsg'); m.className = 'msg'; m.textContent = 'Un momento…';
+  const email = $('lEmail').value.trim(), password = $('lPass').value;
+  try {
+    if (modoLogin === 'crear') {
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { nombre: $('lNombre').value.trim() } } });
+      if (error) throw error;
+      if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('already registered');
+      if (!data.session) { m.textContent = 'Cuenta creada. Revisá tu correo para confirmarla y después entrá.'; return; }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error;
+    }
+    m.textContent = '';
+  } catch (err) { m.className = 'msg err'; m.textContent = traducir(err); }
+};
+$('lOlvide').onclick = async () => {
+  const email = $('lEmail').value.trim(); const m = $('lMsg');
+  if (!email) { m.className = 'msg err'; m.textContent = 'Escribí tu correo arriba y tocá de nuevo.'; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  m.className = error ? 'msg err' : 'msg'; m.textContent = error ? traducir(error) : 'Te mandamos un correo para cambiar la contraseña.';
+};
+$('fClave').onsubmit = async (e) => { e.preventDefault(); const { error } = await sb.auth.updateUser({ password: $('nPass').value }); if (error) { $('nMsg').className = 'msg err'; $('nMsg').textContent = traducir(error); } else { toast('Contraseña cambiada.'); entrarAlPanel(); } };
+$('noRe').onclick = () => entrarAlPanel().catch((e) => toast(traducir(e)));
+$('salir').onclick = async () => { await sb.auth.signOut(); };
+
+async function arrancar() {
+  if (MODO_PRUEBA) { $('demo').hidden = false; await entrarAlPanel(); return; }
+  sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+  let enPanel = false;
+  sb.auth.onAuthStateChange((ev, session) => {
+    if (ev === 'PASSWORD_RECOVERY') { user = session.user; ver('vClave'); return; }
+    if (session?.user) { user = session.user; if (!enPanel) { enPanel = true; setTimeout(() => entrarAlPanel().catch((e) => toast(traducir(e))), 0); } }
+    else { user = null; enPanel = false; $('salir').hidden = true; $('who').textContent = 'Pablito y Mirian'; ver('vLogin'); }
+  });
+}
+arrancar().catch((e) => { console.error(e); toast(traducir(e)); });
+</script>
+</body>
+</html>
