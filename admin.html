@@ -51,7 +51,9 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
 .stat b{display:block;font-family:var(--f-display);font-size:20px;color:var(--navy);font-variant-numeric:tabular-nums}
 .stat span{font-size:12.5px;color:var(--muted)}
 .stat[aria-pressed="true"]{border-color:var(--navy-2);background:var(--sky-2)}
-.tools{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:8px;margin-bottom:10px}
+.tools{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.masivo{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--sky-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:14px}
+.masivo div{display:flex;gap:8px;flex-wrap:wrap}
 .acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:12px}
 .acts .count{font-weight:700;color:var(--navy)}
 .acts div{display:flex;gap:8px;flex-wrap:wrap}
@@ -89,7 +91,7 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
 .estado.off{background:#FFF4D6;border-color:#EBD9A4;color:#5C4400}.estado.off span{color:#5C4400}
 .estado.on{background:#DDF3E6;border-color:#B5DFC5;color:#145C33}.estado.on span{color:#145C33}
 .help{font-size:13px;color:var(--muted);margin:0 0 14px}
-@media (max-width:640px){.tools{grid-template-columns:1fr 1fr}.tools #q{grid-column:1/-1}.fotoed{grid-template-columns:110px minmax(0,1fr)}.fotoed .pic{width:110px}.two{grid-template-columns:1fr}.row{grid-template-columns:52px minmax(0,1fr)}.row .p{grid-column:2;text-align:left}}
+@media (max-width:640px){.tools{grid-template-columns:1fr 1fr}.tools #q,.tools #fm{grid-column:1/-1}.fotoed{grid-template-columns:110px minmax(0,1fr)}.fotoed .pic{width:110px}.two{grid-template-columns:1fr}.row{grid-template-columns:52px minmax(0,1fr)}.row .p{grid-column:2;text-align:left}}
 </style>
 </head>
 <body>
@@ -145,7 +147,9 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
       <input id="q" type="search" placeholder="Buscar por nombre, marca o código" autocomplete="off" aria-label="Buscar">
       <select id="fs" aria-label="Sección"></select>
       <select id="fr" aria-label="Rubro"></select>
+      <select id="fm" aria-label="Marca"></select>
     </div>
+    <div class="masivo" id="masivo" hidden><span id="masT"></span><div><button class="btn dan" id="masOc" type="button">Ocultar toda la marca</button><button class="btn sec" id="masVe" type="button">Mostrar toda la marca</button></div></div>
     <div class="acts">
       <span class="count" id="count">Cargando…</span>
       <div>
@@ -198,7 +202,7 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
 <script src="datos.js"></script>
 <script>
 const PAGE = 50;
-let sb = null, user = null, CAMBIOS = new Map(), P = [], BYID = new Map(), st = { q: '', s: '', r: '', f: '', shown: PAGE }, ed = null, fotoNueva = null, quitarFoto = false, modoLogin = 'entrar';
+let sb = null, user = null, CAMBIOS = new Map(), P = [], BYID = new Map(), st = { q: '', s: '', r: '', m: '', f: '', shown: PAGE }, ed = null, fotoNueva = null, quitarFoto = false, modoLogin = 'entrar';
 
 function toast(t) { const e = $('toast'); e.textContent = t; e.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (e.hidden = true), 3000); }
 function ver(id) { ['vLogin', 'vNo', 'vClave', 'vPanel'].forEach((v) => ($(v).hidden = v !== id)); }
@@ -278,10 +282,51 @@ function armarRubros() {
   const rs = [...new Set(P.filter((p) => !st.s || p.s === st.s).map((p) => p.r))].sort((a, b) => a.localeCompare(b, 'es'));
   $('fr').innerHTML = '<option value="">Todos los rubros</option>' + rs.map((r) => `<option>${esc(r)}</option>`).join('');
   $('fr').value = rs.includes(st.r) ? st.r : (st.r = '');
+  armarMarcas();
 }
+const esGrupo = (m) => /^Más marcas/.test(m);
+function armarMarcas() {
+  const c = {}; let sin = 0;
+  P.forEach((p) => { if ((!st.s || p.s === st.s) && (!st.r || p.r === st.r)) { if (p.m) c[p.m] = (c[p.m] || 0) + 1; else sin++; } });
+  const ms = Object.keys(c).sort((x, y) => (esGrupo(x) - esGrupo(y)) || x.localeCompare(y, 'es'));
+  $('fm').innerHTML = `<option value="">Todas las marcas (${ms.length})</option>` + ms.map((m) => `<option value="${esc(m)}">${esc(esGrupo(m) ? m.replace(/^Más marcas: /, 'Varias marcas · ') : m)} (${c[m]})</option>`).join('') + (sin ? `<option value="__sin">Sin marca (${sin})</option>` : '');
+  $('fm').value = st.m && (c[st.m] || (st.m === '__sin' && sin)) ? st.m : (st.m = '');
+  pintarMasivo();
+}
+function pintarMasivo() {
+  const ok = st.m && st.m !== '__sin' && !esGrupo(st.m);
+  $('masivo').hidden = !ok; if (!ok) return;
+  const ps = P.filter((p) => p.m === st.m); const oc = ps.filter((p) => p.oc).length;
+  $('masT').innerHTML = `<b>${esc(st.m)}</b>: ${ps.length} productos en todo el catálogo` + (oc ? ` · ${oc} ocultos` : '');
+  $('masOc').hidden = oc === ps.length; $('masVe').hidden = oc === 0;
+}
+async function masivo(ocultar) {
+  const ps = P.filter((p) => p.m === st.m && !p.nuevo && p.oc !== ocultar);
+  if (!ps.length) return;
+  if (!confirm(`¿${ocultar ? 'Ocultar' : 'Volver a mostrar'} los ${ps.length} productos de ${st.m}?`)) return;
+  const up = [], del = [];
+  ps.forEach((p) => {
+    const prev = CAMBIOS.get(p.id);
+    const base = prev ? { cod: p.id, nuevo: false, nombre: prev.nombre, precio: prev.precio, seccion: prev.seccion, rubro: prev.rubro, marca: prev.marca, foto_url: prev.foto_url } : { cod: p.id, nuevo: false, nombre: null, precio: null, seccion: null, rubro: null, marca: null, foto_url: null };
+    const soloOculto = ['nombre', 'precio', 'seccion', 'rubro', 'marca', 'foto_url'].every((k) => base[k] == null);
+    if (!ocultar && soloOculto) del.push(p.id); else up.push({ ...base, oculto: ocultar });
+  });
+  ['masOc', 'masVe'].forEach((id) => ($(id).disabled = true)); $('masT').textContent = 'Guardando…';
+  try {
+    if (MODO_PRUEBA) { up.forEach((r) => Guardar.upsert(r)); for (const c of del) await Guardar.borrar(c); }
+    else {
+      for (let i = 0; i < up.length; i += 500) { const { error } = await sb.from('catalogo_cambios').upsert(up.slice(i, i + 500)); if (error) throw error; }
+      for (let i = 0; i < del.length; i += 200) { const { error } = await sb.from('catalogo_cambios').delete().in('cod', del.slice(i, i + 200)); if (error) throw error; }
+    }
+    await cargarTodo(); toast(ocultar ? `Listo: ${ps.length} productos ocultos.` : `Listo: ${ps.length} productos visibles de nuevo.`);
+  } catch (err) { toast(traducir(err)); pintarMasivo(); }
+  finally { ['masOc', 'masVe'].forEach((id) => ($(id).disabled = false)); }
+}
+$('masOc').onclick = () => masivo(true);
+$('masVe').onclick = () => masivo(false);
 function filtrados() {
   const fn = FILTROS.find((f) => f[0] === st.f)[2]; const words = nz(st.q).split(/\s+/).filter(Boolean);
-  let ps = P.filter((p) => fn(p) && (!st.s || p.s === st.s) && (!st.r || p.r === st.r) && words.every((w) => p.q.includes(w)));
+  let ps = P.filter((p) => fn(p) && (!st.s || p.s === st.s) && (!st.r || p.r === st.r) && (!st.m || (st.m === '__sin' ? !p.m : p.m === st.m)) && words.every((w) => p.q.includes(w)));
   if (st.f === 'ed' || st.f === 'nu' || st.f === 'ft') ps.sort((a, b) => String(b.cambio?.actualizado || '').localeCompare(String(a.cambio?.actualizado || '')));
   else ps.sort((a, b) => a.n.localeCompare(b.n, 'es'));
   return ps;
@@ -395,7 +440,8 @@ $('csv').onclick = () => {
 
 let qt; $('q').addEventListener('input', (e) => { clearTimeout(qt); qt = setTimeout(() => { st.q = e.target.value.trim(); st.shown = PAGE; render(); }, 200); });
 $('fs').onchange = (e) => { st.s = e.target.value; st.r = ''; st.shown = PAGE; armarRubros(); render(); };
-$('fr').onchange = (e) => { st.r = e.target.value; st.shown = PAGE; render(); };
+$('fr').onchange = (e) => { st.r = e.target.value; st.shown = PAGE; armarMarcas(); render(); };
+$('fm').onchange = (e) => { st.m = e.target.value; st.shown = PAGE; pintarMasivo(); render(); };
 $('more').onclick = () => { st.shown += PAGE; render(); };
 
 /* ---------- Publicado / oculto ---------- */
