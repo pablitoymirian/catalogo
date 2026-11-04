@@ -83,6 +83,11 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
 .pf{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px 16px;border-top:1px solid var(--line)}
 .pf .pri{flex:1}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:#111B33;color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;z-index:60;max-width:calc(100% - 32px);text-align:center}
+.estado{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-radius:14px;padding:12px 14px;margin-bottom:14px;border:1px solid var(--line);background:var(--card)}
+.estado b{display:block;font-family:var(--f-display);font-size:15.5px}
+.estado span{font-size:13px;color:var(--muted)}
+.estado.off{background:#FFF4D6;border-color:#EBD9A4;color:#5C4400}.estado.off span{color:#5C4400}
+.estado.on{background:#DDF3E6;border-color:#B5DFC5;color:#145C33}.estado.on span{color:#145C33}
 .help{font-size:13px;color:var(--muted);margin:0 0 14px}
 @media (max-width:640px){.tools{grid-template-columns:1fr 1fr}.tools #q{grid-column:1/-1}.fotoed{grid-template-columns:110px minmax(0,1fr)}.fotoed .pic{width:110px}.two{grid-template-columns:1fr}.row{grid-template-columns:52px minmax(0,1fr)}.row .p{grid-column:2;text-align:left}}
 </style>
@@ -134,6 +139,7 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
 
   <!-- Panel -->
   <section id="vPanel" hidden>
+    <div class="estado" id="estado"><div><b id="estT">Estado del catálogo…</b><span id="estD"></span></div><button class="btn" id="estB" type="button" hidden></button></div>
     <div class="stats" id="stats"></div>
     <div class="tools">
       <input id="q" type="search" placeholder="Buscar por nombre, marca o código" autocomplete="off" aria-label="Buscar">
@@ -392,6 +398,31 @@ $('fs').onchange = (e) => { st.s = e.target.value; st.r = ''; st.shown = PAGE; a
 $('fr').onchange = (e) => { st.r = e.target.value; st.shown = PAGE; render(); };
 $('more').onclick = () => { st.shown += PAGE; render(); };
 
+/* ---------- Publicado / oculto ---------- */
+let publicado = null;
+function pintarEstado() {
+  const e = $('estado'), b = $('estB');
+  if (MODO_PRUEBA) { e.hidden = true; return; }
+  e.className = 'estado ' + (publicado ? 'on' : 'off');
+  $('estT').textContent = publicado ? 'Catálogo publicado' : 'Catálogo oculto para los clientes';
+  $('estD').textContent = publicado ? 'Cualquiera que entre al link ve los productos.' : 'Los clientes ven un cartel de "muy pronto". Vos lo ves completo mientras tengas la sesión abierta.';
+  b.hidden = false; b.className = 'btn ' + (publicado ? 'dan' : 'pri'); b.textContent = publicado ? 'Ocultar catálogo' : 'Publicar catálogo';
+}
+async function leerEstado() {
+  if (MODO_PRUEBA) { pintarEstado(); return; }
+  const { data, error } = await sb.from('catalogo_config').select('publicado').eq('id', 1).maybeSingle();
+  if (error) throw error; publicado = !!(data && data.publicado); pintarEstado();
+}
+$('estB').onclick = async () => {
+  const nuevo = !publicado;
+  if (!confirm(nuevo ? '¿Publicar el catálogo? Desde ahora cualquiera que entre al link lo va a ver.' : '¿Ocultar el catálogo? Los clientes van a ver el cartel de "muy pronto".')) return;
+  $('estB').disabled = true;
+  try {
+    const { error } = await sb.from('catalogo_config').update({ publicado: nuevo, actualizado: new Date().toISOString() }).eq('id', 1);
+    if (error) throw error; publicado = nuevo; pintarEstado(); toast(nuevo ? 'Catálogo publicado.' : 'Catálogo oculto.');
+  } catch (err) { toast(traducir(err)); } finally { $('estB').disabled = false; }
+};
+
 /* ---------- Cuenta ---------- */
 async function esAdmin() {
   const { data, error } = await sb.from('catalogo_admins').select('user_id').eq('user_id', user.id).maybeSingle();
@@ -400,7 +431,7 @@ async function esAdmin() {
 async function entrarAlPanel() {
   $('who').textContent = MODO_PRUEBA ? 'Modo prueba' : user.email; $('salir').hidden = MODO_PRUEBA; $('miclave').hidden = MODO_PRUEBA;
   if (!MODO_PRUEBA && !(await esAdmin())) { $('noEmail').textContent = user.email; ver('vNo'); return; }
-  ver('vPanel'); await cargarTodo();
+  ver('vPanel'); leerEstado().catch((e) => toast(traducir(e))); await cargarTodo();
 }
 $('lModo').onclick = () => { modoLogin = modoLogin === 'entrar' ? 'crear' : 'entrar'; const c = modoLogin === 'crear';
   $('lNombreW').hidden = !c; $('lBtn').textContent = c ? 'Crear cuenta' : 'Entrar'; $('lModo').textContent = c ? 'Ya tengo cuenta' : 'Crear cuenta';

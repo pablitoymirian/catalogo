@@ -8,6 +8,30 @@ const CONFIG = {
 };
 const MODO_PRUEBA = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_KEY;
 
+/* ¿El catálogo está publicado para los clientes? (interruptor del panel) */
+async function leerPublicado() {
+  if (MODO_PRUEBA) return true;
+  try {
+    const r = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/catalogo_config?select=publicado&id=eq.1`, { headers: { apikey: CONFIG.SUPABASE_KEY }, cache: 'no-cache' });
+    if (!r.ok) return false;
+    const d = await r.json();
+    return !!(d[0] && d[0].publicado);
+  } catch (e) { return false; }
+}
+/* ¿Quien mira tiene la sesión de administrador abierta en este navegador? */
+async function hayAdminConectado() {
+  if (MODO_PRUEBA) return false;
+  try {
+    const ref = new URL(CONFIG.SUPABASE_URL).hostname.split('.')[0];
+    const s = JSON.parse(localStorage.getItem(`sb-${ref}-auth-token`) || 'null');
+    const tok = s && (s.access_token || (s.currentSession && s.currentSession.access_token));
+    if (!tok) return false;
+    const r = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/catalogo_admins?select=user_id`, { headers: { apikey: CONFIG.SUPABASE_KEY, Authorization: 'Bearer ' + tok }, cache: 'no-cache' });
+    if (!r.ok) return false;
+    return (await r.json()).length > 0;
+  } catch (e) { return false; }
+}
+
 const SUC = [
   { id: 'oviedo', n: 'Coronel Oviedo', t: '0982200814' },
   { id: 'caaguazu', n: 'Caaguazú', t: '0986440028' },

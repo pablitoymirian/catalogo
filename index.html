@@ -101,6 +101,16 @@ input[type=text]{font:inherit;font-size:16px;border:1px solid var(--line);border
 .wa{display:block;text-align:center;text-decoration:none;background:var(--wa);color:#fff;border-radius:12px;padding:13px;font:800 16px var(--f-body)}
 .wa[aria-disabled="true"]{opacity:.45;pointer-events:none}
 .row2{display:flex;gap:8px}.row2 .btn{flex:1;background:var(--sky-2);color:var(--navy);border:1px solid var(--line)}
+.esperando>*{visibility:hidden}
+.cerrado>*:not(#pronto){display:none!important}
+#pronto{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:#1C2B4F;color:#fff;text-align:center}
+#pronto .in{max-width:420px}
+#pronto img{width:150px;height:150px}
+#pronto h1{font-family:var(--f-display);font-size:24px;margin:14px 0 8px}
+#pronto p{color:#DDEBFA;margin:0 0 10px}
+#pronto a{color:#8EC5E8;font-size:13px}
+.vprev{background:#FFF4D6;color:#5C4400;font-size:13px;border-bottom:1px solid #EBD9A4}
+.vprev .wrap{padding-block:8px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:#111B33;color:#fff;padding:9px 16px;border-radius:999px;font-size:13.5px;z-index:50}
 footer{padding-block:24px 30px;color:var(--muted);font-size:12.5px;text-align:center}
 @media (min-width:760px){.grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}.suc{grid-template-columns:repeat(4,1fr)}}
@@ -138,7 +148,9 @@ footer{padding-block:24px 30px;color:var(--muted);font-size:12.5px;text-align:ce
 }
 </style>
 </head>
-<body>
+<body class="esperando">
+<section id="pronto" hidden><div class="in"><img src="logo-blanco.png" alt="Distribuidora Pablito y Mirian"><h1>Nuestro catálogo online llega muy pronto</h1><p>Mientras tanto, escribinos por WhatsApp a tu sucursal más cercana:</p><p id="prontosuc"></p><a href="admin.html">Acceso del equipo</a></div></section>
+<div class="vprev" id="vprev" hidden><div class="wrap"><b>Vista previa.</b> El catálogo todavía <b>no está publicado</b>: los clientes ven un cartel de "muy pronto". Lo publicás desde el <a href="admin.html">panel</a>.</div></div>
 
 <header>
   <div class="wrap">
@@ -202,6 +214,14 @@ const PAGE = 48, MAXPDF = 600;
 let P = [], BYID = new Map(), st = { s: '', r: '', m: '', q: '', ord: 'az', shown: PAGE }, cart = {}, suc = '';
 
 async function init() {
+  const [pub, adm] = await Promise.all([leerPublicado(), hayAdminConectado()]);
+  document.body.classList.remove('esperando');
+  if (!pub && !adm) {
+    document.body.classList.add('cerrado'); $('pronto').hidden = false;
+    $('prontosuc').innerHTML = SUC.map((s) => `${s.n}: <a href="https://wa.me/595${s.t.replace(/^0/, '')}" style="font-size:inherit">${s.t}</a>`).join('<br>');
+    return;
+  }
+  if (!pub) { $('vprev').hidden = false; document.querySelector('header').before($('vprev')); }
   await cargarBase();
   $('fecha').textContent = D.fecha;
   let cambios = [];
@@ -359,7 +379,7 @@ $('nombre').addEventListener('input', renderCart);
 $('copy').onclick = () => { const t = msg(); if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => toast('Pedido copiado')).catch(() => toast('No se pudo copiar')); else toast('No se pudo copiar'); };
 $('clear').onclick = () => { cart = {}; store('pym_pedido', cart); renderCart(); render(); toast('Pedido vacío'); };
 addEventListener('hashchange', () => { st.s = ''; st.r = ''; readHash(); st.shown = PAGE; render(); });
-init().catch((e) => { console.error(e); $('count').textContent = 'No se pudieron cargar los productos. Actualizá la página.'; });
+init().catch((e) => { console.error(e); document.body.classList.remove('esperando'); $('count').textContent = 'No se pudieron cargar los productos. Actualizá la página.'; });
 </script>
 </body>
 </html>
