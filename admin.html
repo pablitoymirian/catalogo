@@ -90,6 +90,18 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
 .estado span{font-size:13px;color:var(--muted)}
 .estado.off{background:#FFF4D6;border-color:#EBD9A4;color:#5C4400}.estado.off span{color:#5C4400}
 .estado.on{background:#DDF3E6;border-color:#B5DFC5;color:#145C33}.estado.on span{color:#145C33}
+.listos{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:14px}
+.listos summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.listos summary b{font-family:var(--f-display);font-size:15.5px;color:var(--navy)}
+.listos summary span{font-size:13px;color:var(--muted)}
+.ls-s{border-top:1px solid var(--line);padding:8px 0}
+.ls-row{display:flex;align-items:center;gap:10px;cursor:pointer}
+.ls-row input{width:18px;height:18px;accent-color:#1C2B4F;flex:none}
+.ls-row .n{flex:1;min-width:0}.ls-row small{color:var(--muted);font-size:12px}
+.ls-s>.ls-row .n{font-weight:700}
+.ls-r{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 14px;padding:6px 0 4px 28px}
+.ls-r .ls-row{font-size:13.5px}
+.ls-tg{background:none;border:0;color:var(--navy-2);font:700 12.5px var(--f-body);cursor:pointer;text-decoration:underline;padding:0}
 .help{font-size:13px;color:var(--muted);margin:0 0 14px}
 @media (max-width:640px){.tools{grid-template-columns:1fr 1fr}.tools #q,.tools #fm{grid-column:1/-1}.fotoed{grid-template-columns:110px minmax(0,1fr)}.fotoed .pic{width:110px}.two{grid-template-columns:1fr}.row{grid-template-columns:52px minmax(0,1fr)}.row .p{grid-column:2;text-align:left}}
 </style>
@@ -142,6 +154,11 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
   <!-- Panel -->
   <section id="vPanel" hidden>
     <div class="estado" id="estado"><div><b id="estT">Estado del catálogo…</b><span id="estD"></span></div><button class="btn" id="estB" type="button" hidden></button></div>
+    <details class="listos" id="listos">
+      <summary><b>Secciones que ven los clientes</b><span id="lsRes">Cargando…</span></summary>
+      <p class="help" style="margin:10px 0">Marcá una sección entera o solo algunos rubros. Lo que no esté marcado les aparece a los clientes como <b>"muy pronto"</b>. Se guarda al tocar.</p>
+      <div id="lsList"></div>
+    </details>
     <div class="stats" id="stats"></div>
     <div class="tools">
       <input id="q" type="search" placeholder="Buscar por nombre, marca o código" autocomplete="off" aria-label="Buscar">
@@ -260,6 +277,7 @@ async function cargarTodo() {
   P = aplicarCambios(cs).filter((p) => p.n || p.nuevo);
   BYID = new Map(P.map((p) => [p.id, p]));
   armarFiltros(); render();
+  leerListosAdmin().then(pintarListos).catch((e) => { $('lsRes').textContent = traducir(e); });
 }
 const FILTROS = [
   ['', 'Todos los productos', () => true],
@@ -443,6 +461,45 @@ $('fs').onchange = (e) => { st.s = e.target.value; st.r = ''; st.shown = PAGE; a
 $('fr').onchange = (e) => { st.r = e.target.value; st.shown = PAGE; armarMarcas(); render(); };
 $('fm').onchange = (e) => { st.m = e.target.value; st.shown = PAGE; pintarMasivo(); render(); };
 $('more').onclick = () => { st.shown += PAGE; render(); };
+
+/* ---------- Secciones y rubros habilitados ---------- */
+let LISTOS = new Set(); const abiertos = new Set();
+async function leerListosAdmin() {
+  if (MODO_PRUEBA) { LISTOS = new Set(load('pym_cat_listos_prueba', ['*'])); return; }
+  const { data, error } = await sb.from('catalogo_listos').select('clave'); if (error) throw error;
+  LISTOS = new Set(data.map((x) => x.clave));
+}
+async function marcar(clave, si) {
+  if (MODO_PRUEBA) { si ? LISTOS.add(clave) : LISTOS.delete(clave); store('pym_cat_listos_prueba', [...LISTOS]); return; }
+  if (si) { const { error } = await sb.from('catalogo_listos').upsert({ clave }); if (error) throw error; LISTOS.add(clave); }
+  else { const { error } = await sb.from('catalogo_listos').delete().eq('clave', clave); if (error) throw error; LISTOS.delete(clave); }
+}
+function pintarListos() {
+  const vis = P.filter((p) => !p.oc);
+  const secs = ordenarSecciones(vis);
+  const ok = (p) => LISTOS.has(p.s) || LISTOS.has(p.s + ' › ' + p.r);
+  const nOk = vis.filter(ok).length;
+  $('lsRes').textContent = `${nOk.toLocaleString('es-PY')} de ${vis.length.toLocaleString('es-PY')} productos visibles para los clientes`;
+  $('lsList').innerHTML = secs.map((s) => {
+    const ps = vis.filter((p) => p.s === s); const entera = LISTOS.has(s);
+    const rc = {}; ps.forEach((p) => (rc[p.r] = (rc[p.r] || 0) + 1));
+    const parciales = Object.keys(rc).filter((r) => LISTOS.has(s + ' › ' + r)).length;
+    const abierto = abiertos.has(s) || (!entera && parciales > 0);
+    const rubros = Object.keys(rc).sort((x, y) => x.localeCompare(y, 'es')).map((r) =>
+      `<label class="ls-row"><input type="checkbox" data-k="${esc(s + ' › ' + r)}" ${entera || LISTOS.has(s + ' › ' + r) ? 'checked' : ''} ${entera ? 'disabled' : ''}><span class="n">${esc(r)} <small>${rc[r]}</small></span></label>`).join('');
+    const estado = entera ? 'toda la sección' : parciales ? `${parciales} de ${Object.keys(rc).length} rubros` : 'muy pronto';
+    return `<div class="ls-s"><label class="ls-row"><input type="checkbox" data-k="${esc(s)}" ${entera ? 'checked' : ''}><span class="n">${esc(s)} <small>· ${ps.length.toLocaleString('es-PY')} productos · ${estado}</small></span></label>
+      <button class="ls-tg" type="button" data-s="${esc(s)}">${abierto ? 'Ocultar rubros' : 'Elegir rubros'}</button>
+      <div class="ls-r" ${abierto ? '' : 'hidden'}>${rubros}</div></div>`;
+  }).join('');
+  $('lsList').querySelectorAll('input[data-k]').forEach((i) => (i.onchange = async () => {
+    i.disabled = true;
+    try { await marcar(i.dataset.k, i.checked); toast(i.checked ? 'Habilitado para los clientes.' : 'Ahora les aparece "muy pronto".'); }
+    catch (err) { i.checked = !i.checked; toast(traducir(err)); }
+    pintarListos();
+  }));
+  $('lsList').querySelectorAll('.ls-tg').forEach((b) => (b.onclick = () => { const s = b.dataset.s; abiertos.has(s) ? abiertos.delete(s) : abiertos.add(s); pintarListos(); }));
+}
 
 /* ---------- Publicado / oculto ---------- */
 let publicado = null;

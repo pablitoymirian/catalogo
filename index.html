@@ -47,6 +47,11 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:va
 main{padding-block:16px 120px}
 h2{font-family:var(--f-display);font-size:20px;margin:6px 0 12px;color:var(--navy);text-wrap:balance}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:22px}
+.tile.pronto{opacity:.72;border-style:dashed}.tile.pronto small{color:var(--navy-2,#2F4A7A);font-weight:700}
+.rchip.pronto{border-style:dashed;opacity:.75}
+.empty.prep b{display:block;font-family:var(--f-display);color:var(--navy);font-size:17px;margin-bottom:6px}
+.empty.prep span{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
+.empty.prep a{background:#1C2B4F;color:#fff;text-decoration:none;font-weight:700;font-size:13.5px;padding:8px 14px;border-radius:999px}
 .tile{display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px;cursor:pointer;text-align:left;font:inherit;color:inherit;min-width:0}
 .tile .ph{width:56px;height:56px;flex:none;border-radius:10px;background-color:#fff;background-repeat:no-repeat}
 .tile b{display:block;font-size:13.5px;line-height:1.2}.tile small{color:var(--muted);font-size:12px}
@@ -226,13 +231,20 @@ async function init() {
   $('fecha').textContent = D.fecha;
   let cambios = [];
   try { cambios = await leerCambios(); } catch (e) { console.warn('No se pudieron leer los cambios', e); }
-  P = aplicarCambios(cambios).filter((p) => !p.oc && p.n);
+  ALL = aplicarCambios(cambios).filter((p) => !p.oc && p.n);
+  ADM = adm;
+  try { LISTOS = await leerListos(); } catch (e) { LISTOS = new Set(); }
+  P = adm ? ALL : ALL.filter(listo);
   BYID = new Map(P.map((p) => [p.id, p]));
   cart = load('pym_pedido', {}); suc = load('pym_suc', '');
   for (const k of Object.keys(cart)) if (!BYID.has(k)) delete cart[k];
   buildChips(); buildTiles(); buildSuc(); readHash(); render(); renderCart();
 }
-function secs() { return ordenarSecciones(P); }
+let ALL = [], LISTOS = new Set(), ADM = false;
+const listo = (p) => LISTOS.has('*') || LISTOS.has(p.s) || LISTOS.has(p.s + ' › ' + p.r);
+const secListos = (s) => ALL.filter((p) => p.s === s && listo(p)).length;
+const rubListo = (s, r) => LISTOS.has('*') || LISTOS.has(s) || LISTOS.has(s + ' › ' + r);
+function secs() { return ordenarSecciones(ALL); }
 function buildChips() {
   const c = $('chips'); c.innerHTML = '';
   [['Todo', ''], ...secs().map((s) => [s, s])].forEach(([lab, val]) => {
@@ -244,15 +256,17 @@ function mode(ps) { const c = {}; ps.forEach((p) => (c[p.r] = (c[p.r] || 0) + 1)
 function buildTiles() {
   const t = $('tiles'); t.innerHTML = '';
   secs().forEach((s) => {
-    const ps = P.filter((p) => p.s === s);
-    const rep = (s === 'Peluquería profesional' && ps.find((p) => p.l === 'Igora Royal')) || ps.find((p) => p.f) || ps.find((p) => !p.il) || mode(ps);
-    const b = document.createElement('button'); b.className = 'tile'; b.type = 'button';
-    b.innerHTML = `<div class="ph"></div><div style="min-width:0"><b>${esc(s)}</b><small>${ps.length.toLocaleString('es-PY')} productos</small></div>`;
+    const todos = ALL.filter((p) => p.s === s); const ps = P.filter((p) => p.s === s); const nl = secListos(s);
+    const pool = ps.length ? ps : todos;
+    const rep = (s === 'Peluquería profesional' && pool.find((p) => p.f && /igora/i.test(p.n))) || pool.find((p) => p.f) || pool.find((p) => !p.il) || mode(pool);
+    const b = document.createElement('button'); b.className = 'tile' + (nl ? '' : ' pronto'); b.type = 'button';
+    const sub = nl ? `${(ADM ? nl : ps.length).toLocaleString('es-PY')} productos` + (ADM && nl < todos.length ? ` visibles de ${todos.length.toLocaleString('es-PY')}` : '') : (ADM ? `Oculta · ${todos.length.toLocaleString('es-PY')} productos` : 'Muy pronto');
+    b.innerHTML = `<div class="ph"></div><div style="min-width:0"><b>${esc(s)}</b><small>${sub}</small></div>`;
     pic(b.firstChild, rep); b.onclick = () => { st.s = s; st.r = ''; st.m = ''; st.shown = PAGE; sync(true); }; t.appendChild(b);
   });
 }
 function rubrosOf(s) {
-  const c = {}; P.forEach((p) => { if (p.s === s) c[p.r] = (c[p.r] || 0) + 1; }); const o = RORDER[s];
+  const c = {}; ALL.forEach((p) => { if (p.s === s) c[p.r] = (c[p.r] || 0) + 1; }); const o = RORDER[s];
   const ix = (x) => { const i = o ? o.indexOf(x) : -1; return i < 0 ? 999 : i; };
   return Object.keys(c).sort((a, b) => (o ? ix(a) - ix(b) || c[b] - c[a] : c[b] - c[a])).map((r) => [r, c[r]]);
 }
@@ -286,9 +300,10 @@ function render() {
   if (st.s) {
     $('sectitle').textContent = st.s;
     const rb = $('rubros'); rb.innerHTML = ''; const tot = P.filter((p) => p.s === st.s).length;
-    [['Todo', tot, ''], ...rubrosOf(st.s).map(([r, n]) => [r, n, r])].forEach(([lab, n, val]) => {
-      const b = document.createElement('button'); b.className = 'rchip'; b.type = 'button';
-      b.setAttribute('aria-pressed', st.r === val ? 'true' : 'false'); b.innerHTML = `${esc(lab)}<small>${n}</small>`;
+    const rs = rubrosOf(st.s).map(([r, n]) => [r, n, r, rubListo(st.s, r)]).sort((a, b) => (b[3] - a[3]));
+    [['Todo', tot, '', true], ...rs].forEach(([lab, n, val, ok]) => {
+      const b = document.createElement('button'); b.className = 'rchip' + (ok ? '' : ' pronto'); b.type = 'button';
+      b.setAttribute('aria-pressed', st.r === val ? 'true' : 'false'); b.innerHTML = `${esc(lab)}<small>${ok ? n : (ADM ? 'oculto' : 'pronto')}</small>`;
       b.onclick = () => { st.r = val; st.m = ''; st.shown = PAGE; sync(); }; rb.appendChild(b);
     });
   }
@@ -300,7 +315,11 @@ function render() {
   $('fm').value = st.m; $('ord').value = st.ord;
   const ps = filtered(); const g = $('grid'); g.innerHTML = '';
   $('count').textContent = `${ps.length.toLocaleString('es-PY')} productos` + (st.q ? ` para “${st.q}”` : '') + (home ? ' en el catálogo' : '');
-  if (!ps.length) g.innerHTML = '<div class="empty">No encontramos productos con esa búsqueda. Probá con otra palabra o escribinos: tenemos mucho más en el local.</div>';
+  const enPrep = !ADM && st.s && !st.q && (st.r ? !rubListo(st.s, st.r) : !secListos(st.s));
+  if (enPrep) {
+    g.innerHTML = `<div class="empty prep"><b>${esc(st.r || st.s)}: muy pronto en el catálogo online</b>Estamos cargando las fotos y los precios de esta sección. Mientras tanto, consultanos por WhatsApp: tenemos todo en el local.<span>${SUC.map((x) => `<a href="https://wa.me/595${x.t.replace(/^0/, '')}?text=${encodeURIComponent('Hola! Quería consultar por ' + (st.r || st.s))}" target="_blank" rel="noopener">${x.n}</a>`).join('')}</span></div>`;
+    $('count').textContent = '';
+  } else if (!ps.length) g.innerHTML = '<div class="empty">No encontramos productos con esa búsqueda. Probá con otra palabra o escribinos: tenemos mucho más en el local.</div>';
   const frag = document.createDocumentFragment(); ps.slice(0, st.shown).forEach((p) => frag.appendChild(card(p))); g.appendChild(frag);
   $('more').hidden = ps.length <= st.shown; $('more').textContent = `Ver más productos (${(ps.length - Math.min(st.shown, ps.length)).toLocaleString('es-PY')} restantes)`;
   document.querySelectorAll('#chips .chip').forEach((b) => b.setAttribute('aria-pressed', b.dataset.s === st.s ? 'true' : 'false'));

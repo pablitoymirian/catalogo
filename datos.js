@@ -18,6 +18,13 @@ async function leerPublicado() {
     return !!(d[0] && d[0].publicado);
   } catch (e) { return false; }
 }
+/* Secciones y rubros habilitados para los clientes ('Sección' o 'Sección › Rubro'; '*' = todo) */
+async function leerListos() {
+  if (MODO_PRUEBA) { const v = load('pym_cat_listos_prueba', null); return new Set(v || ['*']); }
+  const r = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/catalogo_listos?select=clave`, { headers: { apikey: CONFIG.SUPABASE_KEY }, cache: 'no-cache' });
+  if (!r.ok) throw new Error('listos ' + r.status);
+  return new Set((await r.json()).map((x) => x.clave));
+}
 /* ¿Quien mira tiene la sesión de administrador abierta en este navegador? */
 async function hayAdminConectado() {
   if (MODO_PRUEBA) return false;
