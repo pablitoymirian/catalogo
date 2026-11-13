@@ -154,6 +154,7 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
   <!-- Panel -->
   <section id="vPanel" hidden>
     <div class="estado" id="estado"><div><b id="estT">Estado del catálogo…</b><span id="estD"></span></div><button class="btn" id="estB" type="button" hidden></button></div>
+    <div class="estado" id="pend" hidden><div><b id="pendT"></b><span id="pendD"></span></div><button class="btn pri" id="pendB" type="button">Cargar ahora</button></div>
     <details class="listos" id="listos">
       <summary><b>Secciones que ven los clientes</b><span id="lsRes">Cargando…</span></summary>
       <p class="help" style="margin:10px 0">Marcá una sección entera o solo algunos rubros. Lo que no esté marcado les aparece a los clientes como <b>"muy pronto"</b>. Se guarda al tocar.</p>
@@ -534,7 +535,7 @@ async function esAdmin() {
 async function entrarAlPanel() {
   $('who').textContent = MODO_PRUEBA ? 'Modo prueba' : user.email; $('salir').hidden = MODO_PRUEBA; $('miclave').hidden = MODO_PRUEBA;
   if (!MODO_PRUEBA && !(await esAdmin())) { $('noEmail').textContent = user.email; ver('vNo'); return; }
-  ver('vPanel'); leerEstado().catch((e) => toast(traducir(e))); await cargarTodo();
+  ver('vPanel'); leerEstado().catch((e) => toast(traducir(e))); await cargarTodo(); revisarPendientes().catch(() => {});
 }
 $('lModo').onclick = () => { modoLogin = modoLogin === 'entrar' ? 'crear' : 'entrar'; const c = modoLogin === 'crear';
   $('lNombreW').hidden = !c; $('lBtn').textContent = c ? 'Crear cuenta' : 'Entrar'; $('lModo').textContent = c ? 'Ya tengo cuenta' : 'Crear cuenta';
@@ -564,6 +565,35 @@ $('fClave').onsubmit = async (e) => { e.preventDefault(); const { error } = awai
 $('noRe').onclick = () => entrarAlPanel().catch((e) => toast(traducir(e)));
 $('salir').onclick = async () => { await sb.auth.signOut(); };
 $('miclave').onclick = () => { $('nPass').value = ''; $('nMsg').textContent = ''; ver('vClave'); };
+
+/* Cargas preparadas por Claude (pendientes.json): se aplican con un toque */
+async function revisarPendientes() {
+  if (MODO_PRUEBA) return;
+  const r = await fetch('pendientes.json?' + Date.now()); if (!r.ok) return;
+  const lotes = await r.json(); const falta = [];
+  for (const l of lotes) {
+    const cods = l.filas.map((f) => f.cod); const hay = {};
+    for (let i = 0; i < cods.length; i += 200) { const { data, error } = await sb.from('catalogo_cambios').select('cod,foto_url').in('cod', cods.slice(i, i + 200)); if (error) throw error; data.forEach((d) => (hay[d.cod] = d.foto_url)); }
+    const f = l.filas.filter((x) => hay[x.cod] !== x.foto_url); if (f.length) falta.push({ ...l, filas: f });
+  }
+  if (!falta.length) { $('pend').hidden = true; return; }
+  const n = falta.reduce((a, l) => a + l.filas.length, 0);
+  $('pendT').textContent = 'Hay ' + n + ' productos listos para cargar';
+  $('pendD').textContent = falta.map((l) => l.titulo).join(' · ');
+  $('pend').hidden = false;
+  $('pendB').onclick = async () => {
+    $('pendB').disabled = true; $('pendB').textContent = 'Cargando…';
+    try {
+      for (const l of falta) {
+        const viejos = l.filas.filter((x) => !x.nuevo), nuevos = l.filas.filter((x) => x.nuevo);
+        if (viejos.length) { const { error } = await sb.from('catalogo_cambios').upsert(viejos); if (error) throw error; }
+        if (nuevos.length) { const { error } = await sb.from('catalogo_cambios').upsert(nuevos); if (error) throw error; }
+      }
+      toast('Listo, se cargaron ' + n + ' productos.'); $('pend').hidden = true; await cargarTodo();
+    } catch (e) { toast(traducir(e)); }
+    $('pendB').disabled = false; $('pendB').textContent = 'Cargar ahora';
+  };
+}
 
 async function arrancar() {
   if (MODO_PRUEBA) { $('demo').hidden = false; await entrarAlPanel(); return; }
