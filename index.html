@@ -84,6 +84,19 @@ select{min-width:0;width:100%;font:inherit;font-size:14px;border:1px solid var(-
 .empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:22px;text-align:center;color:var(--muted);grid-column:1/-1}
 .cartbtn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:25;background:#1C2B4F;color:#fff;border:2px solid #8EC5E8;border-radius:999px;padding:12px 20px;font:700 15px var(--f-body);box-shadow:0 8px 24px rgba(17,27,51,.35);cursor:pointer;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
 .cartbtn b{font-family:var(--f-display)}
+.pal{display:flex;gap:3px;align-items:center;flex-wrap:wrap}.pal i{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.12)}.pal small{font-size:11px;color:var(--muted);margin-left:3px;font-weight:700}
+.colp{overflow:auto;padding:12px 16px;flex:1}
+.cprev{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;margin-bottom:12px}
+.cprev .pic{width:96px;border-radius:10px;border:1px solid var(--line)}
+.cbig{height:96px;border-radius:14px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px 12px;font:800 22px var(--f-display);box-shadow:inset 0 0 0 1px rgba(0,0,0,.1)}
+.cbig small{font:700 12px var(--f-body);opacity:.85}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
+.cgrid button{border:1px solid rgba(0,0,0,.12);border-radius:10px;height:46px;cursor:pointer;font:700 11px var(--f-body);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;position:relative}
+.cgrid button[aria-pressed="true"]{outline:3px solid #1C2B4F;outline-offset:1px}
+.cgrid button b{position:absolute;top:2px;right:3px;background:#1C2B4F;color:#fff;border-radius:999px;font-size:10px;padding:0 5px;line-height:15px}
+.cdot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:4px;border:1px solid rgba(0,0,0,.15)}
+.cfoot{padding:12px 16px 16px;border-top:1px solid var(--line);display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center}
+.cfoot .qty{height:40px}
 .sheet{position:fixed;inset:0;z-index:40;background:rgba(10,16,32,.55);display:flex;align-items:flex-end;justify-content:center}
 .panel{background:var(--card);color:var(--ink);width:100%;max-width:640px;max-height:92%;border-radius:18px 18px 0 0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
 .ph1{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;border-bottom:1px solid var(--line)}
@@ -210,12 +223,24 @@ footer{padding-block:24px 30px;color:var(--muted);font-size:12.5px;text-align:ce
     </div>
   </div>
 </div>
+<div class="sheet" id="csheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="ct">
+    <div class="ph1"><h3 id="ct">Elegí el color</h3><button class="x" id="cclose" type="button" aria-label="Cerrar">×</button></div>
+    <div class="colp">
+      <div class="cprev"><div class="pic" id="cpic"></div><div class="cbig" id="cbig"></div></div>
+      <div class="small" id="csub" style="margin-bottom:8px">Tocá un color para verlo. Podés agregar varios colores.</div>
+      <div class="cgrid" id="cgrid"></div>
+    </div>
+    <div class="cfoot"><div class="qty"><button type="button" id="cmen" aria-label="Quitar uno">−</button><span id="cq">1</span><button type="button" id="cmas" aria-label="Agregar uno">+</button></div><button class="btn wa" id="cadd" type="button" style="border:0">Agregar al pedido</button></div>
+  </div>
+</div>
 <div class="toast" id="toast" hidden></div>
 <div id="print"></div>
 
 <script src="datos.js"></script>
 <script>
 const PAGE = 48, MAXPDF = 600;
+let COL = {}; const base = (k) => String(k).split('#')[0], colorDe = (k) => String(k).split('#')[1] || '';
 let P = [], BYID = new Map(), st = { s: '', r: '', m: '', q: '', ord: 'az', shown: PAGE }, cart = {}, suc = '';
 
 async function init() {
@@ -228,6 +253,7 @@ async function init() {
   }
   if (!pub) { $('vprev').hidden = false; document.querySelector('header').before($('vprev')); }
   await cargarBase();
+  try { const r = await fetch('colores.json?' + Math.floor(Date.now() / 36e5)); if (r.ok) COL = await r.json(); } catch (e) { COL = {}; }
   $('fecha').textContent = D.fecha;
   let cambios = [];
   try { cambios = await leerCambios(); } catch (e) { console.warn('No se pudieron leer los cambios', e); }
@@ -237,7 +263,7 @@ async function init() {
   P = adm ? ALL : ALL.filter(listo);
   BYID = new Map(P.map((p) => [p.id, p]));
   cart = load('pym_pedido', {}); suc = load('pym_suc', '');
-  for (const k of Object.keys(cart)) if (!BYID.has(k)) delete cart[k];
+  for (const k of Object.keys(cart)) if (!BYID.has(base(k)) || (colorDe(k) && !COL[base(k)])) delete cart[k];
   buildChips(); buildTiles(); buildSuc(); readHash(); render(); renderCart();
 }
 let ALL = [], LISTOS = new Set(), ADM = false;
@@ -284,17 +310,24 @@ const precio = (p) => (p.p > 0 ? gs(p.p) : 'Consultar');
 function card(p) {
   const d = document.createElement('article'); d.className = 'card';
   d.innerHTML = `<div class="pic">${p.il ? '<i>Imagen ilustrativa</i>' : ''}</div><div class="body"><div class="nm"></div><div class="meta"><span class="cod">Cód. ${esc(p.id)}</span><span class="price">${precio(p)}</span></div><div class="act"></div></div>`;
-  d.querySelector('.nm').textContent = p.n; pic(d.firstChild, p); act(d.querySelector('.act'), p); return d;
+  d.querySelector('.nm').textContent = p.n;
+  if (COL[p.id]) { const c = COL[p.id].c, pl = document.createElement('div'); pl.className = 'pal'; const st = Math.max(1, Math.floor(c.length / 12)); pl.innerHTML = c.filter((_, i) => i % st === 0).slice(0, 12).map((x) => `<i style="background:${x[1]}"></i>`).join('') + `<small>${c.length} colores</small>`; d.querySelector('.nm').after(pl); }
+  pic(d.firstChild, p); act(d.querySelector('.act'), p); return d;
 }
-function act(el, p) {
-  const q = cart[p.id] || 0;
-  if (!q) { el.innerHTML = '<button class="btn add" type="button">Agregar al pedido</button>'; el.firstChild.onclick = () => setQ(p.id, 1, el, p); }
+function act(el, p, key) {
+  if (COL[p.id] && !key) {
+    const n = Object.entries(cart).filter(([k]) => base(k) === p.id).reduce((a, [, q]) => a + q, 0);
+    el.innerHTML = `<button class="btn add" type="button">${n ? 'Colores elegidos: ' + n : 'Elegir colores'}</button>`; el.firstChild.onclick = () => abrirColores(p); return;
+  }
+  const k0 = key || p.id;
+  const q = cart[k0] || 0;
+  if (!q) { el.innerHTML = '<button class="btn add" type="button">Agregar al pedido</button>'; el.firstChild.onclick = () => setQ(k0, 1, el, p, key); }
   else {
     el.innerHTML = `<div class="qty"><button type="button" aria-label="Quitar uno">−</button><span>${q}</span><button type="button" aria-label="Agregar uno">+</button></div>`;
-    const [m, , pl] = el.firstChild.children; m.onclick = () => setQ(p.id, q - 1, el, p); pl.onclick = () => setQ(p.id, q + 1, el, p);
+    const [m, , pl] = el.firstChild.children; m.onclick = () => setQ(k0, q - 1, el, p, key); pl.onclick = () => setQ(k0, q + 1, el, p, key);
   }
 }
-function setQ(k, q, el, p) { if (q <= 0) delete cart[k]; else cart[k] = q; store('pym_pedido', cart); if (el) act(el, p); renderCart(); }
+function setQ(k, q, el, p, key) { if (q <= 0) delete cart[k]; else cart[k] = q; store('pym_pedido', cart); if (el) act(el, p, key); renderCart(); }
 function render() {
   const home = !st.s && !st.q; $('home').hidden = !home; $('sechead').hidden = !st.s;
   if (st.s) {
@@ -334,10 +367,11 @@ function readHash() {
   if (b) { const r = rubrosOf(s).map((x) => x[0]).find((x) => slug(x) === b); if (r) st.r = r; }
 }
 function sync(top) { writeHash(); render(); if (top) window.scrollTo({ top: 0, behavior: 'smooth' }); }
-function lines() { return Object.entries(cart).map(([k, q]) => ({ p: BYID.get(k), q })).filter((x) => x.p); }
+function lines() { return Object.entries(cart).map(([k, q]) => ({ k, p: BYID.get(base(k)), c: colorDe(k), q })).filter((x) => x.p).sort((a, b) => (a.p.n + a.c).localeCompare(b.p.n + b.c, 'es', { numeric: true })); }
+const hexDe = (x) => { const e = COL[x.p.id] && COL[x.p.id].c.find((y) => y[0] === x.c); return e ? e[1] : '#ccc'; };
 function msg() {
   const L = lines(); const tot = L.reduce((a, x) => a + x.p.p * x.q, 0); const nom = $('nombre').value.trim(); const s = SUC.find((x) => x.id === suc);
-  return `Hola! Quiero hacer este pedido del catálogo${s ? ' (sucursal ' + s.n + ')' : ''}:\n\n` + L.map((x) => `• ${x.q} x ${x.p.n} (Cód. ${x.p.id}) - ${precio(x.p)} c/u`).join('\n') + `\n\nTotal estimado: ${gs(tot)} (precio minorista)` + (nom ? `\nNombre: ${nom}` : '') + `\n\n¿Me confirman disponibilidad y precio por cantidad?`;
+  return `Hola! Quiero hacer este pedido del catálogo${s ? ' (sucursal ' + s.n + ')' : ''}:\n\n` + L.map((x) => `• ${x.q} x ${x.p.n}${x.c ? ' - COLOR ' + x.c : ''} (Cód. ${x.p.id}) - ${precio(x.p)} c/u`).join('\n') + `\n\nTotal estimado: ${gs(tot)} (precio minorista)` + (nom ? `\nNombre: ${nom}` : '') + `\n\n¿Me confirman disponibilidad y precio por cantidad?`;
 }
 function renderCart() {
   const L = lines(); const n = L.reduce((a, x) => a + x.q, 0); const tot = L.reduce((a, x) => a + x.p.p * x.q, 0);
@@ -346,7 +380,7 @@ function renderCart() {
   const it = $('items'); it.innerHTML = L.length ? '' : '<p class="small" style="padding:14px 0">Todavía no agregaste productos.</p>';
   L.forEach((x) => {
     const r = document.createElement('div'); r.className = 'it'; r.innerHTML = `<div class="pic"></div><div class="t"></div><div class="act"></div>`;
-    pic(r.firstChild, x.p); r.children[1].innerHTML = `${esc(x.p.n)}<small>Cód. ${esc(x.p.id)} · ${precio(x.p)} c/u</small>`; act(r.children[2], x.p); it.appendChild(r);
+    pic(r.firstChild, x.p); r.children[1].innerHTML = `${esc(x.p.n)}${x.c ? `<small style="color:var(--ink);font-weight:700"><span class="cdot" style="background:${hexDe(x)}"></span>Color ${esc(x.c)}</small>` : ''}<small>Cód. ${esc(x.p.id)} · ${precio(x.p)} c/u</small>`; act(r.children[2], x.p, x.c ? x.k : undefined); it.appendChild(r);
   });
   const s = SUC.find((x) => x.id === suc); const wa = $('wa');
   if (s && L.length) { wa.href = `https://wa.me/595${s.t.replace(/^0/, '')}?text=${encodeURIComponent(msg())}`; wa.setAttribute('aria-disabled', 'false'); wa.textContent = `Enviar pedido por WhatsApp a ${s.n}`; }
@@ -381,7 +415,7 @@ $('pdfped').onclick = () => {
   const tot = L.reduce((a, x) => a + x.p.p * x.q, 0); const nom = $('nombre').value.trim(); const s = SUC.find((x) => x.id === suc);
   imprimir(cabeceraPdf('Mi pedido' + (nom ? ' · ' + nom : '') + (s ? ' · Sucursal ' + s.n : '')) +
     `<table class="pr-t"><thead><tr><th></th><th>Producto</th><th>Cód.</th><th class="r">Cant.</th><th class="r">Precio c/u</th><th class="r">Subtotal</th></tr></thead><tbody>` +
-    L.map((x) => `<tr><td><div class="pic" data-k="${esc(x.p.id)}"></div></td><td>${esc(x.p.n)}</td><td>${esc(x.p.id)}</td><td class="r">${x.q}</td><td class="r">${precio(x.p)}</td><td class="r">${gs(x.p.p * x.q)}</td></tr>`).join('') +
+    L.map((x) => `<tr><td><div class="pic" data-k="${esc(x.p.id)}"></div></td><td>${esc(x.p.n)}${x.c ? ' · <b>Color ' + esc(x.c) + '</b>' : ''}</td><td>${esc(x.p.id)}</td><td class="r">${x.q}</td><td class="r">${precio(x.p)}</td><td class="r">${gs(x.p.p * x.q)}</td></tr>`).join('') +
     `</tbody><tfoot><tr><td></td><td colspan="4"><b>Total estimado (precio minorista)</b></td><td class="r"><b>${gs(tot)}</b></td></tr></tfoot></table>` + pieContacto());
 };
 
@@ -391,6 +425,23 @@ $('fm').onchange = (e) => { st.m = e.target.value; st.shown = PAGE; sync(); };
 $('ord').onchange = (e) => { st.ord = e.target.value; sync(); };
 $('back').onclick = () => { st.s = ''; st.r = ''; st.m = ''; st.shown = PAGE; sync(true); };
 $('more').onclick = () => { st.shown += PAGE; render(); };
+/* Selector de colores (productos con un mismo código y muchos tonos) */
+let CP = null, CSEL = '', CQ = 1;
+const txtSobre = (h) => { const n = parseInt(h.slice(1), 16), l = ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000; return l > 150 ? '#1C2B4F' : '#fff'; };
+function abrirColores(p) { CP = p; CQ = 1; CSEL = COL[p.id].c[0][0]; $('ct').textContent = p.n; pic($('cpic'), p); pintarColores(); $('csheet').hidden = false; }
+function pintarColores() {
+  const c = COL[CP.id].c, h = c.find((x) => x[0] === CSEL)[1];
+  const b = $('cbig'); b.style.background = h; b.style.color = txtSobre(h); b.innerHTML = `<span>Color ${esc(CSEL)}</span><small>${precio(CP)}</small>`;
+  $('cgrid').innerHTML = c.map((x) => { const q = cart[CP.id + '#' + x[0]] || 0; return `<button type="button" data-c="${x[0]}" aria-pressed="${x[0] === CSEL}" style="background:${x[1]};color:${txtSobre(x[1])}" aria-label="Color ${x[0]}">${x[0]}${q ? `<b>${q}</b>` : ''}</button>`; }).join('');
+  $('cq').textContent = CQ; const ya = cart[CP.id + '#' + CSEL] || 0;
+  $('cadd').textContent = ya ? `Agregar más (tenés ${ya})` : `Agregar color ${CSEL}`;
+}
+$('cgrid').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; CSEL = b.dataset.c; CQ = 1; pintarColores(); };
+$('cmen').onclick = () => { CQ = Math.max(1, CQ - 1); pintarColores(); };
+$('cmas').onclick = () => { CQ++; pintarColores(); };
+$('cadd').onclick = () => { const k = CP.id + '#' + CSEL; setQ(k, (cart[k] || 0) + CQ); toast(`Agregado: color ${CSEL} × ${CQ}`); CQ = 1; pintarColores(); };
+const cerrarColores = () => { $('csheet').hidden = true; render(); };
+$('cclose').onclick = cerrarColores; $('csheet').onclick = (e) => { if (e.target.id === 'csheet') cerrarColores(); };
 $('cartbtn').onclick = () => { $('sheet').hidden = false; renderCart(); };
 $('close').onclick = () => { $('sheet').hidden = true; render(); };
 $('sheet').onclick = (e) => { if (e.target.id === 'sheet') { $('sheet').hidden = true; render(); } };
