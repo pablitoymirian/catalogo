@@ -240,7 +240,12 @@ footer{padding-block:24px 30px;color:var(--muted);font-size:12.5px;text-align:ce
 <script src="datos.js"></script>
 <script>
 const PAGE = 48, MAXPDF = 600;
-let COL = {}; const base = (k) => String(k).split('#')[0], colorDe = (k) => String(k).split('#')[1] || '';
+let COL = {}, MIEM = new Map(); const base = (k) => String(k).split('#')[0], colorDe = (k) => String(k).split('#')[1] || '';
+/* Paletas: un producto con muchos colores. Si el color trae 4º dato, es el código propio de ese tono (grupo de productos). */
+const colores = (id) => (COL[id] ? COL[id].c.filter((x) => !x[3] || BYID.has(x[3])) : []);
+const tieneCol = (id) => colores(id).length > 0;
+const prodDe = (id, c) => { const x = COL[id] && COL[id].c.find((y) => y[0] === c); return (x && x[3] && BYID.get(x[3])) || BYID.get(id); };
+function precioCard(p) { if (!tieneCol(p.id)) return precio(p); const v = colores(p.id).map((x) => prodDe(p.id, x[0])).filter(Boolean).map((q) => q.p).filter((n) => n > 0); return v.length && Math.min(...v) !== Math.max(...v) ? 'Desde ' + gs(Math.min(...v)) : precio(p); }
 let P = [], BYID = new Map(), st = { s: '', r: '', m: '', q: '', ord: 'az', shown: PAGE }, cart = {}, suc = '';
 
 async function init() {
@@ -262,8 +267,10 @@ async function init() {
   try { LISTOS = await leerListos(); } catch (e) { LISTOS = new Set(); }
   P = adm ? ALL : ALL.filter(listo);
   BYID = new Map(P.map((p) => [p.id, p]));
+  MIEM = new Map(); for (const [r, g] of Object.entries(COL)) if (BYID.has(r)) for (const x of g.c) if (x[3] && x[3] !== r) MIEM.set(x[3], r);
+  P = P.filter((p) => !MIEM.has(p.id));
   cart = load('pym_pedido', {}); suc = load('pym_suc', '');
-  for (const k of Object.keys(cart)) if (!BYID.has(base(k)) || (colorDe(k) && !COL[base(k)])) delete cart[k];
+  for (const k of Object.keys(cart)) if (!BYID.has(base(k)) || (colorDe(k) && !colores(base(k)).some((x) => x[0] === colorDe(k)))) delete cart[k];
   buildChips(); buildTiles(); buildSuc(); readHash(); render(); renderCart();
 }
 let ALL = [], LISTOS = new Set(), ADM = false;
@@ -309,13 +316,13 @@ function filtered() {
 const precio = (p) => (p.p > 0 ? gs(p.p) : 'Consultar');
 function card(p) {
   const d = document.createElement('article'); d.className = 'card';
-  d.innerHTML = `<div class="pic">${p.il ? '<i>Imagen ilustrativa</i>' : ''}</div><div class="body"><div class="nm"></div><div class="meta"><span class="cod">Cód. ${esc(p.id)}</span><span class="price">${precio(p)}</span></div><div class="act"></div></div>`;
+  d.innerHTML = `<div class="pic">${p.il ? '<i>Imagen ilustrativa</i>' : ''}</div><div class="body"><div class="nm"></div><div class="meta"><span class="cod">Cód. ${esc(p.id)}</span><span class="price">${precioCard(p)}</span></div><div class="act"></div></div>`;
   d.querySelector('.nm').textContent = p.n;
-  if (COL[p.id]) { const c = COL[p.id].c, pl = document.createElement('div'); pl.className = 'pal'; const st = Math.max(1, Math.floor(c.length / 12)); pl.innerHTML = c.filter((_, i) => i % st === 0).slice(0, 12).map((x) => `<i style="background:${x[1]}"></i>`).join('') + `<small>${c.length} colores</small>`; d.querySelector('.nm').after(pl); }
+  if (tieneCol(p.id)) { const c = colores(p.id), pl = document.createElement('div'); pl.className = 'pal'; const st = Math.max(1, Math.floor(c.length / 12)); pl.innerHTML = c.filter((_, i) => i % st === 0).slice(0, 12).map((x) => `<i style="background:${x[1]}"></i>`).join('') + `<small>${c.length} colores</small>`; d.querySelector('.nm').after(pl); }
   pic(d.firstChild, p); act(d.querySelector('.act'), p); return d;
 }
 function act(el, p, key) {
-  if (COL[p.id] && !key) {
+  if (tieneCol(p.id) && !key) {
     const n = Object.entries(cart).filter(([k]) => base(k) === p.id).reduce((a, [, q]) => a + q, 0);
     el.innerHTML = `<button class="btn add" type="button">${n ? 'Colores elegidos: ' + n : 'Elegir colores'}</button>`; el.firstChild.onclick = () => abrirColores(p); return;
   }
@@ -367,11 +374,12 @@ function readHash() {
   if (b) { const r = rubrosOf(s).map((x) => x[0]).find((x) => slug(x) === b); if (r) st.r = r; }
 }
 function sync(top) { writeHash(); render(); if (top) window.scrollTo({ top: 0, behavior: 'smooth' }); }
-function lines() { return Object.entries(cart).map(([k, q]) => ({ k, p: BYID.get(base(k)), c: colorDe(k), q })).filter((x) => x.p).sort((a, b) => (a.p.n + a.c).localeCompare(b.p.n + b.c, 'es', { numeric: true })); }
-const hexDe = (x) => { const e = COL[x.p.id] && COL[x.p.id].c.find((y) => y[0] === x.c); return e ? e[1] : '#ccc'; };
+function lines() { return Object.entries(cart).map(([k, q]) => { const c = colorDe(k), r = BYID.get(base(k)); return { k, p: c ? prodDe(base(k), c) : r, r, c, q }; }).filter((x) => x.p && x.r).sort((a, b) => (nm(a) + a.c).localeCompare(nm(b) + b.c, 'es', { numeric: true })); }
+const nm = (x) => (x.c ? x.r.n : x.p.n);
+const hexDe = (x) => { const e = COL[base(x.k)] && COL[base(x.k)].c.find((y) => y[0] === x.c); return e ? e[1] : '#ccc'; };
 function msg() {
   const L = lines(); const tot = L.reduce((a, x) => a + x.p.p * x.q, 0); const nom = $('nombre').value.trim(); const s = SUC.find((x) => x.id === suc);
-  return `Hola! Quiero hacer este pedido del catálogo${s ? ' (sucursal ' + s.n + ')' : ''}:\n\n` + L.map((x) => `• ${x.q} x ${x.p.n}${x.c ? ' - COLOR ' + x.c : ''} (Cód. ${x.p.id}) - ${precio(x.p)} c/u`).join('\n') + `\n\nTotal estimado: ${gs(tot)} (precio minorista)` + (nom ? `\nNombre: ${nom}` : '') + `\n\n¿Me confirman disponibilidad y precio por cantidad?`;
+  return `Hola! Quiero hacer este pedido del catálogo${s ? ' (sucursal ' + s.n + ')' : ''}:\n\n` + L.map((x) => `• ${x.q} x ${nm(x)}${x.c ? ' - COLOR ' + x.c : ''} (Cód. ${x.p.id}) - ${precio(x.p)} c/u`).join('\n') + `\n\nTotal estimado: ${gs(tot)} (precio minorista)` + (nom ? `\nNombre: ${nom}` : '') + `\n\n¿Me confirman disponibilidad y precio por cantidad?`;
 }
 function renderCart() {
   const L = lines(); const n = L.reduce((a, x) => a + x.q, 0); const tot = L.reduce((a, x) => a + x.p.p * x.q, 0);
@@ -380,7 +388,7 @@ function renderCart() {
   const it = $('items'); it.innerHTML = L.length ? '' : '<p class="small" style="padding:14px 0">Todavía no agregaste productos.</p>';
   L.forEach((x) => {
     const r = document.createElement('div'); r.className = 'it'; r.innerHTML = `<div class="pic"></div><div class="t"></div><div class="act"></div>`;
-    pic(r.firstChild, x.p); r.children[1].innerHTML = `${esc(x.p.n)}${x.c ? `<small style="color:var(--ink);font-weight:700"><span class="cdot" style="background:${hexDe(x)}"></span>Color ${esc(x.c)}</small>` : ''}<small>Cód. ${esc(x.p.id)} · ${precio(x.p)} c/u</small>`; act(r.children[2], x.p, x.c ? x.k : undefined); it.appendChild(r);
+    pic(r.firstChild, x.r); r.children[1].innerHTML = `${esc(nm(x))}${x.c ? `<small style="color:var(--ink);font-weight:700"><span class="cdot" style="background:${hexDe(x)}"></span>Color ${esc(x.c)}</small>` : ''}<small>Cód. ${esc(x.p.id)} · ${precio(x.p)} c/u</small>`; act(r.children[2], x.p, x.c ? x.k : undefined); it.appendChild(r);
   });
   const s = SUC.find((x) => x.id === suc); const wa = $('wa');
   if (s && L.length) { wa.href = `https://wa.me/595${s.t.replace(/^0/, '')}?text=${encodeURIComponent(msg())}`; wa.setAttribute('aria-disabled', 'false'); wa.textContent = `Enviar pedido por WhatsApp a ${s.n}`; }
@@ -415,7 +423,7 @@ $('pdfped').onclick = () => {
   const tot = L.reduce((a, x) => a + x.p.p * x.q, 0); const nom = $('nombre').value.trim(); const s = SUC.find((x) => x.id === suc);
   imprimir(cabeceraPdf('Mi pedido' + (nom ? ' · ' + nom : '') + (s ? ' · Sucursal ' + s.n : '')) +
     `<table class="pr-t"><thead><tr><th></th><th>Producto</th><th>Cód.</th><th class="r">Cant.</th><th class="r">Precio c/u</th><th class="r">Subtotal</th></tr></thead><tbody>` +
-    L.map((x) => `<tr><td><div class="pic" data-k="${esc(x.p.id)}"></div></td><td>${esc(x.p.n)}${x.c ? ' · <b>Color ' + esc(x.c) + '</b>' : ''}</td><td>${esc(x.p.id)}</td><td class="r">${x.q}</td><td class="r">${precio(x.p)}</td><td class="r">${gs(x.p.p * x.q)}</td></tr>`).join('') +
+    L.map((x) => `<tr><td><div class="pic" data-k="${esc(x.r.id)}"></div></td><td>${esc(nm(x))}${x.c ? ' · <b>Color ' + esc(x.c) + '</b>' : ''}</td><td>${esc(x.p.id)}</td><td class="r">${x.q}</td><td class="r">${precio(x.p)}</td><td class="r">${gs(x.p.p * x.q)}</td></tr>`).join('') +
     `</tbody><tfoot><tr><td></td><td colspan="4"><b>Total estimado (precio minorista)</b></td><td class="r"><b>${gs(tot)}</b></td></tr></tfoot></table>` + pieContacto());
 };
 
@@ -428,10 +436,10 @@ $('more').onclick = () => { st.shown += PAGE; render(); };
 /* Selector de colores (productos con un mismo código y muchos tonos) */
 let CP = null, CSEL = '', CQ = 1;
 const txtSobre = (h) => { const n = parseInt(h.slice(1), 16), l = ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000; return l > 150 ? '#1C2B4F' : '#fff'; };
-function abrirColores(p) { CP = p; CQ = 1; CSEL = COL[p.id].c[0][0]; $('ct').textContent = p.n; pic($('cpic'), p); pintarColores(); $('csheet').hidden = false; }
+function abrirColores(p) { CP = p; CQ = 1; CSEL = colores(p.id)[0][0]; $('ct').textContent = p.n; pic($('cpic'), p); pintarColores(); $('csheet').hidden = false; }
 function pintarColores() {
-  const c = COL[CP.id].c, h = c.find((x) => x[0] === CSEL)[1];
-  const b = $('cbig'); b.style.background = h; b.style.color = txtSobre(h); const nm = (c.find((x) => x[0] === CSEL)[2]) || ''; b.innerHTML = `<span>Color ${esc(CSEL)}${nm ? ' · ' + esc(nm) : ''}</span><small>${precio(CP)}</small>`;
+  const c = colores(CP.id), h = c.find((x) => x[0] === CSEL)[1];
+  const b = $('cbig'); b.style.background = h; b.style.color = txtSobre(h); const nm = (c.find((x) => x[0] === CSEL)[2]) || ''; b.innerHTML = `<span>Color ${esc(CSEL)}${nm ? ' · ' + esc(nm) : ''}</span><small>${precio(prodDe(CP.id, CSEL))}</small>`;
   $('cgrid').innerHTML = c.map((x) => { const q = cart[CP.id + '#' + x[0]] || 0; return `<button type="button" data-c="${x[0]}" aria-pressed="${x[0] === CSEL}" style="background:${x[1]};color:${txtSobre(x[1])}" aria-label="Color ${x[0]}">${x[0]}${q ? `<b>${q}</b>` : ''}</button>`; }).join('');
   $('cq').textContent = CQ; const ya = cart[CP.id + '#' + CSEL] || 0;
   $('cadd').textContent = ya ? `Agregar más (tenés ${ya})` : `Agregar color ${CSEL}`;
