@@ -573,23 +573,22 @@ async function revisarPendientes() {
   const lotes = await r.json(); const falta = [];
   for (const l of lotes) {
     const cods = l.filas.map((f) => f.cod); const hay = {};
-    for (let i = 0; i < cods.length; i += 200) { const { data, error } = await sb.from('catalogo_cambios').select('cod,foto_url').in('cod', cods.slice(i, i + 200)); if (error) throw error; data.forEach((d) => (hay[d.cod] = d.foto_url)); }
-    const f = l.filas.filter((x) => hay[x.cod] !== x.foto_url); if (f.length) falta.push({ ...l, filas: f });
+    for (let i = 0; i < cods.length; i += 200) { const { data, error } = await sb.from('catalogo_cambios').select('*').in('cod', cods.slice(i, i + 200)); if (error) throw error; data.forEach((d) => (hay[d.cod] = d)); }
+    const f = l.filas.filter((x) => !hay[x.cod] || Object.keys(x).some((k) => k !== 'cod' && hay[x.cod][k] !== x[k])); if (f.length) falta.push({ ...l, filas: f });
   }
   if (!falta.length) { $('pend').hidden = true; return; }
   const n = falta.reduce((a, l) => a + l.filas.length, 0);
-  $('pendT').textContent = 'Hay ' + n + ' productos listos para cargar';
+  $('pendT').textContent = 'Hay ' + n + ' cambios listos para aplicar';
   $('pendD').textContent = falta.map((l) => l.titulo).join(' · ');
   $('pend').hidden = false;
   $('pendB').onclick = async () => {
     $('pendB').disabled = true; $('pendB').textContent = 'Cargando…';
     try {
       for (const l of falta) {
-        const viejos = l.filas.filter((x) => !x.nuevo), nuevos = l.filas.filter((x) => x.nuevo);
-        if (viejos.length) { const { error } = await sb.from('catalogo_cambios').upsert(viejos); if (error) throw error; }
-        if (nuevos.length) { const { error } = await sb.from('catalogo_cambios').upsert(nuevos); if (error) throw error; }
+        const grupos = {}; l.filas.forEach((x) => { const k = Object.keys(x).sort().join(','); (grupos[k] = grupos[k] || []).push(x); });
+        for (const g of Object.values(grupos)) for (let i = 0; i < g.length; i += 300) { const { error } = await sb.from('catalogo_cambios').upsert(g.slice(i, i + 300)); if (error) throw error; }
       }
-      toast('Listo, se cargaron ' + n + ' productos.'); $('pend').hidden = true; await cargarTodo();
+      toast('Listo, se aplicaron ' + n + ' cambios.'); $('pend').hidden = true; await cargarTodo();
     } catch (e) { toast(traducir(e)); }
     $('pendB').disabled = false; $('pendB').textContent = 'Cargar ahora';
   };
