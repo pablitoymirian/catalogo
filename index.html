@@ -431,7 +431,7 @@ const txtSobre = (h) => { const n = parseInt(h.slice(1), 16), l = ((n >> 16) * 2
 function abrirColores(p) { CP = p; CQ = 1; CSEL = COL[p.id].c[0][0]; $('ct').textContent = p.n; pic($('cpic'), p); pintarColores(); $('csheet').hidden = false; }
 function pintarColores() {
   const c = COL[CP.id].c, h = c.find((x) => x[0] === CSEL)[1];
-  const b = $('cbig'); b.style.background = h; b.style.color = txtSobre(h); b.innerHTML = `<span>Color ${esc(CSEL)}</span><small>${precio(CP)}</small>`;
+  const b = $('cbig'); b.style.background = h; b.style.color = txtSobre(h); const nm = (c.find((x) => x[0] === CSEL)[2]) || ''; b.innerHTML = `<span>Color ${esc(CSEL)}${nm ? ' · ' + esc(nm) : ''}</span><small>${precio(CP)}</small>`;
   $('cgrid').innerHTML = c.map((x) => { const q = cart[CP.id + '#' + x[0]] || 0; return `<button type="button" data-c="${x[0]}" aria-pressed="${x[0] === CSEL}" style="background:${x[1]};color:${txtSobre(x[1])}" aria-label="Color ${x[0]}">${x[0]}${q ? `<b>${q}</b>` : ''}</button>`; }).join('');
   $('cq').textContent = CQ; const ya = cart[CP.id + '#' + CSEL] || 0;
   $('cadd').textContent = ya ? `Agregar más (tenés ${ya})` : `Agregar color ${CSEL}`;
