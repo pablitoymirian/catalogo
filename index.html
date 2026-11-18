@@ -135,6 +135,8 @@ footer{padding-block:24px 30px;color:var(--muted);font-size:12.5px;text-align:ce
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s}.card:hover{border-color:var(--sky)}}
 
 .pic.sinfoto{background:var(--sky-2)}
+.pic.prox{background:#F3F6FB url(logo-azul-marino.png) center 38%/38% no-repeat !important;position:relative}
+.pic.prox::after{content:'Foto próximamente';position:absolute;left:0;right:0;bottom:12%;text-align:center;font:600 12px var(--f-body);color:#1C2B4F;opacity:.7}
 .pdfbtn{background:var(--card);color:var(--navy);border:1px solid var(--line);font-size:13px;padding:8px 12px;white-space:nowrap}
 .bar .ctl{grid-template-columns:minmax(0,1fr) auto auto}
 @media (max-width:520px){.bar .ctl{grid-template-columns:1fr 1fr}.bar .ctl .pdfbtn{grid-column:1/-1}}
@@ -203,7 +205,7 @@ footer{padding-block:24px 30px;color:var(--muted);font-size:12.5px;text-align:ce
   </div>
   <div class="grid" id="grid"></div>
   <button class="btn more" id="more" type="button" hidden>Ver más productos</button>
-  <footer>Distribuidora Pablito y Mirian · Coronel Oviedo · Villarrica · Caaguazú · Campo 9<br>Las fotos marcadas como «Imagen ilustrativa» son de referencia: el envase, el modelo o el tono pueden variar.<br><a href="admin.html" style="color:inherit">Acceso del equipo</a></footer>
+  <footer>Distribuidora Pablito y Mirian · Coronel Oviedo · Villarrica · Caaguazú · Campo 9<br>Los colores de las paletas son de referencia: el tono real puede variar.<br><a href="admin.html" style="color:inherit">Acceso del equipo</a></footer>
 </main>
 
 <button class="cartbtn" id="cartbtn" type="button" hidden></button>
@@ -239,6 +241,9 @@ footer{padding-block:24px 30px;color:var(--muted);font-size:12.5px;text-align:ce
 
 <script src="datos.js"></script>
 <script>
+/* En la página pública las imágenes ilustrativas se reemplazan por un recuadro de la marca */
+const picBase = pic;
+pic = function (el, p) { if (p && p.il && !p.f) { el.style.backgroundImage = ''; el.classList.add('prox'); return; } el.classList.remove('prox'); picBase(el, p); };
 const PAGE = 48, MAXPDF = 600;
 let COL = {}, MIEM = new Map(); const base = (k) => String(k).split('#')[0], colorDe = (k) => String(k).split('#')[1] || '';
 /* Paletas: un producto con muchos colores. Si el color trae 4º dato, es el código propio de ese tono (grupo de productos). */
@@ -316,7 +321,7 @@ function filtered() {
 const precio = (p) => (p.p > 0 ? gs(p.p) : 'Consultar');
 function card(p) {
   const d = document.createElement('article'); d.className = 'card';
-  d.innerHTML = `<div class="pic">${p.il ? '<i>Imagen ilustrativa</i>' : ''}</div><div class="body"><div class="nm"></div><div class="meta"><span class="cod">Cód. ${esc(p.id)}</span><span class="price">${precioCard(p)}</span></div><div class="act"></div></div>`;
+  d.innerHTML = `<div class="pic"></div><div class="body"><div class="nm"></div><div class="meta"><span class="cod">Cód. ${esc(p.id)}</span><span class="price">${precioCard(p)}</span></div><div class="act"></div></div>`;
   d.querySelector('.nm').textContent = p.n;
   if (tieneCol(p.id)) { const c = colores(p.id), pl = document.createElement('div'); pl.className = 'pal'; const st = Math.max(1, Math.floor(c.length / 12)); pl.innerHTML = c.filter((_, i) => i % st === 0).slice(0, 12).map((x) => `<i style="background:${x[1]}"></i>`).join('') + `<small>${c.length} colores</small>`; d.querySelector('.nm').after(pl); }
   pic(d.firstChild, p); act(d.querySelector('.act'), p); return d;
