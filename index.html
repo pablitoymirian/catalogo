@@ -198,7 +198,7 @@ footer{padding-block:24px 30px;color:var(--muted);font-size:12.5px;text-align:ce
     <div class="ctl">
       <select id="fm" aria-label="Filtrar por marca"></select>
       <select id="ord" aria-label="Ordenar">
-        <option value="az">Nombre A–Z</option><option value="pa">Precio: menor a mayor</option><option value="pd">Precio: mayor a menor</option>
+        <option value="dest">Destacados</option><option value="az">Nombre A–Z</option><option value="pa">Precio: menor a mayor</option><option value="pd">Precio: mayor a menor</option>
       </select>
       <button class="btn pdfbtn" id="pdf" type="button">Descargar PDF</button>
     </div>
@@ -251,7 +251,7 @@ const colores = (id) => (COL[id] ? COL[id].c.filter((x) => !x[3] || BYID.has(x[3
 const tieneCol = (id) => colores(id).length > 0;
 const prodDe = (id, c) => { const x = COL[id] && COL[id].c.find((y) => y[0] === c); return (x && x[3] && BYID.get(x[3])) || BYID.get(id); };
 function precioCard(p) { if (!tieneCol(p.id)) return precio(p); const v = colores(p.id).map((x) => prodDe(p.id, x[0])).filter(Boolean).map((q) => q.p).filter((n) => n > 0); return v.length && Math.min(...v) !== Math.max(...v) ? 'Desde ' + gs(Math.min(...v)) : precio(p); }
-let P = [], BYID = new Map(), st = { s: '', r: '', m: '', q: '', ord: 'az', shown: PAGE }, cart = {}, suc = '';
+let P = [], BYID = new Map(), st = { s: '', r: '', m: '', q: '', ord: 'dest', shown: PAGE }, cart = {}, suc = '';
 
 async function init() {
   const [pub, adm] = await Promise.all([leerPublicado(), hayAdminConectado()]);
@@ -314,10 +314,27 @@ function buildSuc() {
   $('suc').innerHTML = SUC.map((s) => `<label><input type="radio" name="suc" id="suc-${s.id}" value="${s.id}" ${suc === s.id ? 'checked' : ''}><span>${s.n}<small>${s.t}</small></span></label>`).join('');
   $('suc').querySelectorAll('input').forEach((i) => (i.onchange = () => { suc = i.value; store('pym_suc', suc); renderCart(); }));
 }
+/* Destacados: con foto y precio primero, intercalando marcas (las que más productos tienen van adelante) para que la primera página muestre variedad. */
+function destacados(ps, az) {
+  const top = ps.filter((p) => conFoto(p) && p.p > 0), resto = ps.filter((p) => !(conFoto(p) && p.p > 0));
+  const g = new Map(); for (const p of top.sort(az)) { const k = p.m || ''; if (!g.has(k)) g.set(k, []); g.get(k).push(p); }
+  const sinM = g.get('') || []; g.delete('');
+  const gs_ = [...g.values()].sort((a, b) => b.length - a.length), out = [];
+  const tot = top.length - sinM.length;
+  for (let i = 0; out.length < tot; i++) for (const x of gs_) if (x[i]) out.push(x[i]);
+  out.push(...sinM);
+  return out.concat(resto.sort((a, b) => (conFoto(b) ? 1 : 0) - (conFoto(a) ? 1 : 0) || az(a, b)));
+}
 function filtered() {
   const words = nz(st.q).split(/\s+/).filter(Boolean);
   let ps = P.filter((p) => (!st.s || p.s === st.s) && (!st.r || p.r === st.r) && (!st.m || p.m === st.m) && words.every((w) => p.q.includes(w)));
-  if (st.ord === 'pa') ps.sort((a, b) => a.p - b.p); else if (st.ord === 'pd') ps.sort((a, b) => b.p - a.p); else ps.sort((a, b) => a.n.localeCompare(b.n, 'es'));
+  const az = (a, b) => a.n.localeCompare(b.n, 'es');
+  /* Siempre primero los productos con foto; los sin foto (solo visibles para el equipo) van al final. */
+  const fo = (a, b) => (conFoto(b) ? 1 : 0) - (conFoto(a) ? 1 : 0);
+  if (st.ord === 'pa') ps.sort((a, b) => fo(a, b) || a.p - b.p);
+  else if (st.ord === 'pd') ps.sort((a, b) => fo(a, b) || b.p - a.p);
+  else if (st.ord === 'az' || words.length) ps.sort((a, b) => fo(a, b) || az(a, b));
+  else ps = destacados(ps, az);
   return ps;
 }
 const precio = (p) => (p.p > 0 ? gs(p.p) : 'Consultar');
