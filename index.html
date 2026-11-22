@@ -279,9 +279,11 @@ async function init() {
   buildChips(); buildTiles(); buildSuc(); readHash(); render(); renderCart();
 }
 let ALL = [], LISTOS = new Set(), ADM = false;
-const listo = (p) => LISTOS.has('*') || LISTOS.has(p.s) || LISTOS.has(p.s + ' › ' + p.r);
+/* Al público solo se muestran los productos con foto real (o con paleta de colores). Los demás aparecen solos cuando se les carga la foto. */
+const conFoto = (p) => !!p.f || (p.i != null && p.i >= 0 && !p.il) || !!COL[p.id];
+const listo = (p) => conFoto(p);
 const secListos = (s) => ALL.filter((p) => p.s === s && listo(p)).length;
-const rubListo = (s, r) => LISTOS.has('*') || LISTOS.has(s) || LISTOS.has(s + ' › ' + r);
+const rubListo = (s, r) => ALL.some((p) => p.s === s && p.r === r && listo(p));
 function secs() { return ordenarSecciones(ALL); }
 function buildChips() {
   const c = $('chips'); c.innerHTML = '';
