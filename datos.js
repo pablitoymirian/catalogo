@@ -153,3 +153,14 @@ function enPromo(p, pr) {
   const alts = String(pr.busqueda || '').split(',').map((a) => nz(a).split(/\s+/).filter(Boolean)).filter((a) => a.length);
   return alts.some((ws) => ws.every((w) => p.q.includes(w)));
 }
+
+/* Stock: lista pública de códigos con stock (sin cantidades). Se carga desde el panel subiendo el listado del sistema. */
+async function leerStock() {
+  if (MODO_PRUEBA) return null;
+  try {
+    const r = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/rpc/catalogo_con_stock`, { method: 'POST', headers: { apikey: CONFIG.SUPABASE_KEY, 'Content-Type': 'application/json' }, body: '{}', cache: 'no-cache' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return { activo: !!j.activo && (j.listas || []).length > 0, listas: j.listas || [], set: new Set(j.cods || []) };
+  } catch (e) { return null; }
+}

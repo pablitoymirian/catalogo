@@ -164,6 +164,19 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
   <section id="vPanel" hidden>
     <div class="estado" id="estado"><div><b id="estT">Estado del catálogo…</b><span id="estD"></span></div><button class="btn" id="estB" type="button" hidden></button></div>
     <div class="estado" id="pend" hidden><div><b id="pendT"></b><span id="pendD"></span></div><button class="btn pri" id="pendB" type="button">Cargar ahora</button></div>
+    <details class="listos" id="stockBox">
+      <summary><b>Stock</b><span id="stRes">Cargando…</span></summary>
+      <p class="help" style="margin:10px 0">Subí el <b>listado de stock</b> que sale del sistema (el archivo .csv). Si está activado, a los clientes no se les muestran los productos que tienen stock 0 en <b>todas</b> las listas cargadas. Cuando vuelva a entrar mercadería, subí la lista nueva y esos productos vuelven a aparecer solos. Los productos cargados a mano no se tocan. Vos, como admin, ves todo, y los que no tienen stock llevan la etiqueta <b>Sin stock</b>.</p>
+      <label class="chk" style="display:flex;gap:8px;align-items:center;font-weight:700;margin:6px 0 12px"><input type="checkbox" id="stOcultar"> Ocultar a los clientes los productos sin stock</label>
+      <div id="stList"></div>
+      <div class="pr-f">
+        <label class="f" for="stSuc">Sucursal de la lista</label>
+        <select id="stSuc"><option>Coronel Oviedo</option><option>Villarrica</option><option>Caaguazú</option><option>Campo 9</option></select>
+        <label class="f" for="stFile">Archivo del listado de stock (.csv)</label><input type="file" id="stFile" accept=".csv,.chr,.txt,text/csv">
+        <small class="msg" id="stMsg"></small>
+        <div style="margin-top:12px"><button class="btn pri" type="button" id="stSubir" disabled>Cargar lista</button></div>
+      </div>
+    </details>
     <details class="listos" id="promos">
       <summary><b>Promociones de portada</b><span id="prRes">Cargando…</span></summary>
       <p class="help" style="margin:10px 0">Es el banner grande que ven los clientes al entrar. Si hay varias, van rotando. Al tocar el botón del banner, el cliente ve solo los productos que coinciden con las <b>palabras de búsqueda</b> (podés poner varias opciones separadas por coma). Las fotos salen solas de esos productos, o podés subir una imagen propia. Con las fechas, la promo aparece y desaparece sola.</p>
@@ -320,6 +333,7 @@ async function cargarTodo() {
   armarFiltros(); render();
   leerListosAdmin().then(pintarListos).catch((e) => { $('lsRes').textContent = traducir(e); });
   leerPromosAdm().catch((e) => { $('prRes').textContent = traducir(e); });
+  leerStockAdm().catch((e) => { $('stRes').textContent = traducir(e); });
 }
 const FILTROS = [
   ['', 'Todos los productos', () => true],
@@ -543,6 +557,86 @@ function pintarListos() {
   $('lsList').querySelectorAll('.ls-tg').forEach((b) => (b.onclick = () => { const s = b.dataset.s; abiertos.has(s) ? abiertos.delete(s) : abiertos.add(s); pintarListos(); }));
 }
 
+
+
+/* ---------- Stock ---------- */
+let stFilas = null;
+async function leerStockAdm() {
+  if (MODO_PRUEBA) return;
+  const [{ data: cfg }, { data: info, error }] = await Promise.all([
+    sb.from('catalogo_config').select('ocultar_sin_stock').eq('id', 1).maybeSingle(),
+    sb.rpc('catalogo_con_stock')]);
+  if (error) throw error;
+  $('stOcultar').checked = !!(cfg && cfg.ocultar_sin_stock);
+  const listas = info.listas || [];
+  const cs = new Set(info.cods || []), sin = P.filter((p) => !p.nuevo && !cs.has(p.id)).length;
+  $('stRes').textContent = listas.length ? `${listas.length} lista${listas.length > 1 ? 's' : ''} cargada${listas.length > 1 ? 's' : ''}` : 'Sin listas';
+  $('stList').innerHTML = '';
+  listas.forEach((l) => {
+    const d = document.createElement('div'); d.className = 'pr-it';
+    d.innerHTML = '<div><b></b><small></small></div><button class="btn sec" type="button">Quitar</button>';
+    d.querySelector('b').textContent = l.sucursal;
+    d.querySelector('small').textContent = 'Actualizada el ' + new Date(l.fecha).toLocaleString('es-PY', { timeZone: 'America/Asuncion', dateStyle: 'short', timeStyle: 'short' });
+    d.querySelector('button').onclick = async () => {
+      if (!confirm(`¿Quitar la lista de stock de ${l.sucursal}?`)) return;
+      const { error: e } = await sb.from('catalogo_stock').delete().eq('sucursal', l.sucursal);
+      if (e) { toast(traducir(e)); return; } toast('Lista quitada.'); leerStockAdm();
+    };
+    $('stList').appendChild(d);
+  });
+  if (listas.length) { const m = document.createElement('small'); m.className = 'msg'; m.textContent = `${sin.toLocaleString('es-PY')} de los ${P.filter((p) => !p.nuevo).length.toLocaleString('es-PY')} productos de la base figuran sin stock en las listas cargadas.`; $('stList').appendChild(m); }
+}
+/* Lee el "LISTADO DE STOCK DE PRODUCTOS" del sistema: cada fila trae los títulos y después los valores (código, nombre, stocks, total). */
+function parseCsv(t) {
+  const out = []; let row = [], f = '', q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true; else if (c === ',') { row.push(f); f = ''; } else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(f); out.push(row); row = []; f = ''; } else f += c;
+  }
+  if (f || row.length) { row.push(f); out.push(row); }
+  return out;
+}
+function leerListado(texto) {
+  const filas = parseCsv(texto), res = new Map();
+  for (const r of filas) {
+    const h = r.findIndex((x) => x.trim().toLowerCase() === 'totales'); if (h < 5) continue;
+    const ini = r.findIndex((x) => /^c[oó]digo/i.test(x.trim()) || /digo/i.test(x)); if (ini < 0) continue;
+    const ncol = h - ini + 1, cod = String(r[h + 1] || '').trim(), tot = parseFloat(String(r[h + ncol] || '').replace(',', '.'));
+    if (!cod || Number.isNaN(tot)) continue; res.set(cod, (res.get(cod) || 0) + tot);
+  }
+  return res;
+}
+$('stFile').onchange = async (e) => {
+  const f = e.target.files[0]; stFilas = null; $('stSubir').disabled = true; if (!f) return;
+  const buf = await f.arrayBuffer(); let t = new TextDecoder('utf-8').decode(buf);
+  if (t.includes('\uFFFD')) t = new TextDecoder('windows-1252').decode(buf);
+  const m = leerListado(t);
+  if (!m.size) { $('stMsg').textContent = 'No reconocí el formato. Tiene que ser el "Listado de stock de productos" del sistema, exportado en CSV.'; return; }
+  stFilas = [...m].filter(([, v]) => v > 0).map(([cod, stock]) => ({ cod, stock }));
+  const enCat = P.filter((p) => !p.nuevo && m.has(p.id)).length;
+  $('stMsg').textContent = `${m.size.toLocaleString('es-PY')} productos en el archivo, ${stFilas.length.toLocaleString('es-PY')} con stock. ${enCat.toLocaleString('es-PY')} coinciden con el catálogo.`;
+  $('stSubir').disabled = false;
+};
+$('stSubir').onclick = async () => {
+  if (!stFilas) return; const suc = $('stSuc').value;
+  if (!confirm(`¿Reemplazar la lista de stock de ${suc} con este archivo?`)) return;
+  $('stSubir').disabled = true;
+  try {
+    let { error } = await sb.from('catalogo_stock').delete().eq('sucursal', suc); if (error) throw error;
+    const ahora = new Date().toISOString();
+    for (let i = 0; i < stFilas.length; i += 1000) {
+      $('stMsg').textContent = `Cargando… ${Math.min(i + 1000, stFilas.length).toLocaleString('es-PY')} de ${stFilas.length.toLocaleString('es-PY')}`;
+      ({ error } = await sb.from('catalogo_stock').insert(stFilas.slice(i, i + 1000).map((x) => ({ ...x, sucursal: suc, actualizado: ahora })))); if (error) throw error;
+    }
+    $('stMsg').textContent = `Lista de ${suc} cargada. Los clientes la ven al recargar la página.`; $('stFile').value = ''; stFilas = null; leerStockAdm();
+  } catch (err) { toast(traducir(err)); $('stSubir').disabled = false; }
+};
+$('stOcultar').onchange = async (e) => {
+  const { error } = await sb.from('catalogo_config').update({ ocultar_sin_stock: e.target.checked, actualizado: new Date().toISOString() }).eq('id', 1);
+  if (error) { toast(traducir(error)); e.target.checked = !e.target.checked; return; }
+  toast(e.target.checked ? 'Listo: los productos sin stock quedan ocultos para los clientes.' : 'Listo: se muestran también los productos sin stock.');
+};
 
 /* ---------- Promociones de portada ---------- */
 let PROMOS = [], prEd = null, prImg = null, prLogo = null;

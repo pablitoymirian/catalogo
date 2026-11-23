@@ -97,6 +97,7 @@ select{min-width:0;width:100%;font:inherit;font-size:14px;border:1px solid var(-
 .secttl{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .secttl button{border:0;background:none;color:var(--navy-2);font:700 13px var(--f-body);cursor:pointer;text-decoration:underline}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px}
+.sinst{align-self:flex-start;background:#FDECEC;color:#A12622;font:800 11px var(--f-body);text-transform:uppercase;letter-spacing:.05em;border-radius:6px;padding:3px 7px;margin-bottom:6px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .pic{position:relative;aspect-ratio:1;max-width:100%;background-color:#fff;background-repeat:no-repeat;border-bottom:1px solid var(--line)}
 .pic i{position:absolute;left:6px;bottom:6px;font-style:normal;font-size:10px;font-weight:700;color:#4A5568;background:#E8F3FB;border-radius:5px;padding:2px 6px}
@@ -306,6 +307,7 @@ async function init() {
   ALL = aplicarCambios(cambios).filter((p) => !p.oc && p.n);
   ADM = adm;
   try { LISTOS = await leerListos(); } catch (e) { LISTOS = new Set(); }
+  STK = await leerStock();
   P = adm ? ALL : ALL.filter(listo);
   BYID = new Map(P.map((p) => [p.id, p]));
   MIEM = new Map(); for (const [r, g] of Object.entries(COL)) if (BYID.has(r)) for (const x of g.c) if (x[3] && x[3] !== r) MIEM.set(x[3], r);
@@ -356,7 +358,11 @@ function buildPromo() {
 }
 /* Al público solo se muestran los productos con foto real (o con paleta de colores). Los demás aparecen solos cuando se les carga la foto. */
 const conFoto = (p) => !!p.f || (p.i != null && p.i >= 0 && !p.il) || !!COL[p.id];
-const listo = (p) => conFoto(p);
+/* Sin stock: si hay listas de stock cargadas, se ocultan los productos del sistema que no tienen stock en ninguna sucursal.
+   Los productos cargados a mano (nuevos) no están en el sistema y se muestran igual. Con colores: alcanza con que un tono tenga stock. */
+let STK = null;
+const hayStock = (p) => !STK || !STK.activo || p.nuevo || STK.set.has(p.id) || (COL[p.id] && COL[p.id].c.some((x) => x[3] && STK.set.has(x[3])));
+const listo = (p) => conFoto(p) && hayStock(p);
 const secListos = (s) => ALL.filter((p) => p.s === s && listo(p)).length;
 const rubListo = (s, r) => ALL.some((p) => p.s === s && p.r === r && listo(p));
 function secs() { return ordenarSecciones(ALL); }
@@ -418,6 +424,7 @@ function card(p) {
   d.innerHTML = `<div class="pic"></div><div class="body"><div class="nm"></div><div class="meta"><span class="cod">Cód. ${esc(p.id)}</span><span class="price">${precioCard(p)}</span></div><div class="act"></div></div>`;
   d.querySelector('.nm').textContent = p.n;
   if (tieneCol(p.id)) { const c = colores(p.id), pl = document.createElement('div'); pl.className = 'pal'; const st = Math.max(1, Math.floor(c.length / 12)); pl.innerHTML = c.filter((_, i) => i % st === 0).slice(0, 12).map((x) => `<i style="background:${x[1]}"></i>`).join('') + `<small>${c.length} colores</small>`; d.querySelector('.nm').after(pl); }
+  if (ADM && !hayStock(p)) { const t = document.createElement('span'); t.className = 'sinst'; t.textContent = 'Sin stock'; d.querySelector('.nm').before(t); }
   pic(d.firstChild, p); act(d.querySelector('.act'), p); return d;
 }
 function act(el, p, key) {
