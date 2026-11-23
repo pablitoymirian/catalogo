@@ -102,6 +102,15 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
 .ls-r{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 14px;padding:6px 0 4px 28px}
 .ls-r .ls-row{font-size:13.5px}
 .ls-tg{background:none;border:0;color:var(--navy-2);font:700 12.5px var(--f-body);cursor:pointer;text-decoration:underline;padding:0}
+.pr-it{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.pr-it b{font-family:var(--f-display);color:var(--navy)}.pr-it small{display:block;color:var(--muted);font-size:12.5px}
+.pr-it.off{opacity:.6;border-style:dashed}
+.pr-f{border:1px solid var(--line);border-radius:12px;padding:4px 12px 12px;margin-top:10px;background:var(--bg)}
+.pr-f .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.pr-f input[type=date],.pr-f textarea{width:100%;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);color:var(--ink)}
+.pr-f textarea{min-height:64px;resize:vertical}
+.pr-f .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.pr-f .chk{display:flex;gap:6px;align-items:center;font-weight:700;font-size:13.5px;margin-top:12px}
 .help{font-size:13px;color:var(--muted);margin:0 0 14px}
 @media (max-width:640px){.tools{grid-template-columns:1fr 1fr}.tools #q,.tools #fm{grid-column:1/-1}.fotoed{grid-template-columns:110px minmax(0,1fr)}.fotoed .pic{width:110px}.two{grid-template-columns:1fr}.row{grid-template-columns:52px minmax(0,1fr)}.row .p{grid-column:2;text-align:left}}
 </style>
@@ -155,6 +164,33 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
   <section id="vPanel" hidden>
     <div class="estado" id="estado"><div><b id="estT">Estado del catálogo…</b><span id="estD"></span></div><button class="btn" id="estB" type="button" hidden></button></div>
     <div class="estado" id="pend" hidden><div><b id="pendT"></b><span id="pendD"></span></div><button class="btn pri" id="pendB" type="button">Cargar ahora</button></div>
+    <details class="listos" id="promos">
+      <summary><b>Promociones de portada</b><span id="prRes">Cargando…</span></summary>
+      <p class="help" style="margin:10px 0">Es el banner grande que ven los clientes al entrar. Si hay varias, van rotando. Al tocar el botón del banner, el cliente ve solo los productos que coinciden con las <b>palabras de búsqueda</b> (podés poner varias opciones separadas por coma). Las fotos salen solas de esos productos, o podés subir una imagen propia. Con las fechas, la promo aparece y desaparece sola.</p>
+      <div id="prList"></div>
+      <button class="btn sec" id="prNueva" type="button" style="margin-top:6px">+ Nueva promoción</button>
+      <form class="pr-f" id="prForm" hidden>
+        <label class="f" for="prTit">Título</label><input type="text" id="prTit" required maxlength="60" placeholder="Nueva línea Hello Kitty">
+        <label class="f" for="prTxt">Texto (opcional)</label><textarea id="prTxt" maxlength="160" placeholder="Qué tiene de especial, en una o dos líneas"></textarea>
+        <div class="g2">
+          <div><label class="f" for="prEti">Etiqueta (opcional)</label><input type="text" id="prEti" maxlength="24" placeholder="Recién llegado"></div>
+          <div><label class="f" for="prBot">Texto del botón</label><input type="text" id="prBot" maxlength="30" placeholder="Ver productos"></div>
+        </div>
+        <label class="f" for="prBus">Palabras de búsqueda</label><input type="text" id="prBus" required placeholder="hello kitty">
+        <small class="msg" id="prCnt"></small>
+        <div class="g2">
+          <div><label class="f" for="prDes">Desde (opcional)</label><input type="date" id="prDes"></div>
+          <div><label class="f" for="prHas">Hasta (opcional)</label><input type="date" id="prHas"></div>
+        </div>
+        <div class="g2">
+          <div><label class="f" for="prOrd">Orden</label><input type="number" id="prOrd" min="1" value="1"></div>
+          <div><label class="chk"><input type="checkbox" id="prAct" checked> Activa</label></div>
+        </div>
+        <label class="f" for="prImg">Imagen propia (opcional, horizontal)</label><input type="file" id="prImg" accept="image/*">
+        <small class="msg" id="prImgT"></small>
+        <div class="row"><button class="btn pri" type="submit" id="prGuardar">Guardar</button><button class="btn sec" type="button" id="prCancelar">Cancelar</button><button class="btn dan" type="button" id="prBorrar" hidden>Borrar</button><a class="msg" id="prLink" target="_blank" rel="noopener" hidden>Ver en el catálogo</a></div>
+      </form>
+    </details>
     <details class="listos" id="listos">
       <summary><b>Secciones que ven los clientes</b><span id="lsRes">Cargando…</span></summary>
       <p class="help" style="margin:10px 0">Marcá una sección entera o solo algunos rubros. Lo que no esté marcado les aparece a los clientes como <b>"muy pronto"</b>. Se guarda al tocar.</p>
@@ -279,6 +315,7 @@ async function cargarTodo() {
   BYID = new Map(P.map((p) => [p.id, p]));
   armarFiltros(); render();
   leerListosAdmin().then(pintarListos).catch((e) => { $('lsRes').textContent = traducir(e); });
+  leerPromosAdm().catch((e) => { $('prRes').textContent = traducir(e); });
 }
 const FILTROS = [
   ['', 'Todos los productos', () => true],
@@ -501,6 +538,72 @@ function pintarListos() {
   }));
   $('lsList').querySelectorAll('.ls-tg').forEach((b) => (b.onclick = () => { const s = b.dataset.s; abiertos.has(s) ? abiertos.delete(s) : abiertos.add(s); pintarListos(); }));
 }
+
+
+/* ---------- Promociones de portada ---------- */
+let PROMOS = [], prEd = null, prImg = null;
+const CAT_URL = 'https://pablitoymirian.github.io/catalogo/';
+function enPromoAdm(p, busq) {
+  const alts = String(busq || '').split(',').map((a) => nz(a).split(/\s+/).filter(Boolean)).filter((a) => a.length);
+  const q = p.q || nz([p.n, p.id, p.m, p.l].join(' '));
+  return alts.some((ws) => ws.every((w) => q.includes(w)));
+}
+async function leerPromosAdm() {
+  if (MODO_PRUEBA) { PROMOS = []; pintarPromos(); return; }
+  const { data, error } = await sb.from('catalogo_promos').select('*').order('orden').order('id');
+  if (error) throw error; PROMOS = data || []; pintarPromos();
+}
+function estadoPromo(x) {
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Asuncion' });
+  if (!x.activo) return 'Pausada';
+  if (x.desde && x.desde > hoy) return 'Empieza el ' + x.desde.split('-').reverse().join('/');
+  if (x.hasta && x.hasta < hoy) return 'Terminó el ' + x.hasta.split('-').reverse().join('/');
+  return 'Se ve ahora' + (x.hasta ? ' · hasta el ' + x.hasta.split('-').reverse().join('/') : '');
+}
+function pintarPromos() {
+  const vis = PROMOS.filter((x) => estadoPromo(x).startsWith('Se ve')).length;
+  $('prRes').textContent = PROMOS.length ? `${vis} visible${vis === 1 ? '' : 's'} de ${PROMOS.length}` : 'Ninguna todavía';
+  $('prList').innerHTML = '';
+  PROMOS.forEach((x) => {
+    const d = document.createElement('div'); const est = estadoPromo(x); d.className = 'pr-it' + (est.startsWith('Se ve') ? '' : ' off');
+    const n = P.filter((p) => enPromoAdm(p, x.busqueda)).length;
+    d.innerHTML = `<div><b></b><small></small></div><button class="btn sec" type="button">Editar</button>`;
+    d.querySelector('b').textContent = `${x.orden}. ${x.titulo}`;
+    d.querySelector('small').textContent = `${est} · busca “${x.busqueda}” (${n} productos)`;
+    d.querySelector('button').onclick = () => abrirPromo(x); $('prList').appendChild(d);
+  });
+}
+function contarPromo() { const n = P.filter((p) => enPromoAdm(p, $('prBus').value)).length; $('prCnt').textContent = $('prBus').value.trim() ? `${n} productos coinciden (los clientes ven solo los que tienen foto).` : ''; }
+function abrirPromo(x) {
+  prEd = x || null; prImg = null; $('prForm').hidden = false;
+  $('prTit').value = x?.titulo || ''; $('prTxt').value = x?.texto || ''; $('prEti').value = x?.etiqueta || ''; $('prBot').value = x?.boton || '';
+  $('prBus').value = x?.busqueda || ''; $('prDes').value = x?.desde || ''; $('prHas').value = x?.hasta || '';
+  $('prOrd').value = x?.orden || (PROMOS.length + 1); $('prAct').checked = x ? x.activo : true; $('prImg').value = '';
+  $('prImgT').textContent = x?.imagen_url ? 'Tiene imagen propia. Subí otra para cambiarla.' : 'Sin imagen propia: se usan fotos de los productos.';
+  $('prBorrar').hidden = !x; $('prLink').hidden = !x;
+  if (x) $('prLink').href = CAT_URL + '#promo-' + slug(x.titulo);
+  contarPromo(); $('prTit').focus();
+}
+$('prNueva').onclick = () => abrirPromo(null);
+$('prCancelar').onclick = () => { $('prForm').hidden = true; prEd = null; };
+$('prBus').oninput = contarPromo;
+$('prImg').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { prImg = await achicar(f, 1200); $('prImgT').textContent = 'Imagen lista para guardar.'; } catch (err) { toast(traducir(err)); } };
+$('prForm').onsubmit = async (e) => {
+  e.preventDefault(); $('prGuardar').disabled = true;
+  try {
+    const row = { titulo: $('prTit').value.trim(), texto: $('prTxt').value.trim() || null, etiqueta: $('prEti').value.trim() || null, boton: $('prBot').value.trim() || 'Ver productos',
+      busqueda: $('prBus').value.trim(), desde: $('prDes').value || null, hasta: $('prHas').value || null, orden: +$('prOrd').value || 1, activo: $('prAct').checked, actualizado: new Date().toISOString() };
+    if (prImg) row.imagen_url = await Guardar.foto('promo-' + slug(row.titulo), prImg);
+    const q = prEd ? sb.from('catalogo_promos').update(row).eq('id', prEd.id) : sb.from('catalogo_promos').insert(row);
+    const { error } = await q; if (error) throw error;
+    toast('Promoción guardada. Los clientes la ven al recargar la página.'); $('prForm').hidden = true; prEd = null; await leerPromosAdm();
+  } catch (err) { toast(traducir(err)); } finally { $('prGuardar').disabled = false; }
+};
+$('prBorrar').onclick = async () => {
+  if (!prEd || !confirm(`¿Borrar la promoción “${prEd.titulo}”? Si solo querés sacarla un tiempo, destildá "Activa".`)) return;
+  const { error } = await sb.from('catalogo_promos').delete().eq('id', prEd.id);
+  if (error) { toast(traducir(error)); return; } $('prForm').hidden = true; prEd = null; toast('Promoción borrada.'); await leerPromosAdm();
+};
 
 /* ---------- Publicado / oculto ---------- */
 let publicado = null;

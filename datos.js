@@ -137,3 +137,19 @@ function ordenarSecciones(lista) {
   const todas = [...SORDER.slice(0, -1), ...extra, SORDER[SORDER.length - 1]];
   return todas.filter((s) => lista.some((p) => p.s === s));
 }
+
+/* Promociones de portada (banner rotativo). Solo las activas y dentro de sus fechas. */
+async function leerPromos() {
+  if (MODO_PRUEBA) return [];
+  try {
+    const r = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/catalogo_promos?select=*&activo=eq.true&order=orden,id`, { headers: { apikey: CONFIG.SUPABASE_KEY }, cache: 'no-cache' });
+    if (!r.ok) return [];
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Asuncion' });
+    return (await r.json()).filter((x) => (!x.desde || x.desde <= hoy) && (!x.hasta || x.hasta >= hoy));
+  } catch (e) { return []; }
+}
+/* Productos de una promo: la búsqueda admite varias opciones separadas por coma ("hello kitty, kitty"). */
+function enPromo(p, pr) {
+  const alts = String(pr.busqueda || '').split(',').map((a) => nz(a).split(/\s+/).filter(Boolean)).filter((a) => a.length);
+  return alts.some((ws) => ws.every((w) => p.q.includes(w)));
+}
