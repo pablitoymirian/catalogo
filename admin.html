@@ -182,10 +182,14 @@ input:focus,select:focus,button:focus-visible{outline:3px solid var(--sky);outli
           <div><label class="f" for="prDes">Desde (opcional)</label><input type="date" id="prDes"></div>
           <div><label class="f" for="prHas">Hasta (opcional)</label><input type="date" id="prHas"></div>
         </div>
+        <label class="f" for="prTema">Color del banner</label>
+        <select id="prTema"><option value="marino">Azul marino (el de la marca)</option><option value="rojo">Rojo</option><option value="rosa">Rosa</option><option value="verde">Verde (Navidad)</option></select>
         <div class="g2">
           <div><label class="f" for="prOrd">Orden</label><input type="number" id="prOrd" min="1" value="1"></div>
           <div><label class="chk"><input type="checkbox" id="prAct" checked> Activa</label></div>
         </div>
+        <label class="f" for="prLogo">Logo de la línea (opcional, va al costado del título)</label><input type="file" id="prLogo" accept="image/*">
+        <small class="msg" id="prLogoT"></small>
         <label class="f" for="prImg">Imagen propia (opcional, horizontal)</label><input type="file" id="prImg" accept="image/*">
         <small class="msg" id="prImgT"></small>
         <div class="row"><button class="btn pri" type="submit" id="prGuardar">Guardar</button><button class="btn sec" type="button" id="prCancelar">Cancelar</button><button class="btn dan" type="button" id="prBorrar" hidden>Borrar</button><a class="msg" id="prLink" target="_blank" rel="noopener" hidden>Ver en el catálogo</a></div>
@@ -541,7 +545,7 @@ function pintarListos() {
 
 
 /* ---------- Promociones de portada ---------- */
-let PROMOS = [], prEd = null, prImg = null;
+let PROMOS = [], prEd = null, prImg = null, prLogo = null;
 const CAT_URL = 'https://pablitoymirian.github.io/catalogo/';
 function enPromoAdm(p, busq) {
   const alts = String(busq || '').split(',').map((a) => nz(a).split(/\s+/).filter(Boolean)).filter((a) => a.length);
@@ -575,7 +579,8 @@ function pintarPromos() {
 }
 function contarPromo() { const n = P.filter((p) => enPromoAdm(p, $('prBus').value)).length; $('prCnt').textContent = $('prBus').value.trim() ? `${n} productos coinciden (los clientes ven solo los que tienen foto).` : ''; }
 function abrirPromo(x) {
-  prEd = x || null; prImg = null; $('prForm').hidden = false;
+  prEd = x || null; prImg = null; prLogo = null; $('prForm').hidden = false; $('prTema').value = x?.tema || 'marino'; $('prLogo').value = '';
+  $('prLogoT').textContent = x?.logo_url ? 'Tiene logo. Subí otro para cambiarlo.' : 'Sin logo.';
   $('prTit').value = x?.titulo || ''; $('prTxt').value = x?.texto || ''; $('prEti').value = x?.etiqueta || ''; $('prBot').value = x?.boton || '';
   $('prBus').value = x?.busqueda || ''; $('prDes').value = x?.desde || ''; $('prHas').value = x?.hasta || '';
   $('prOrd').value = x?.orden || (PROMOS.length + 1); $('prAct').checked = x ? x.activo : true; $('prImg').value = '';
@@ -587,13 +592,15 @@ function abrirPromo(x) {
 $('prNueva').onclick = () => abrirPromo(null);
 $('prCancelar').onclick = () => { $('prForm').hidden = true; prEd = null; };
 $('prBus').oninput = contarPromo;
+$('prLogo').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { prLogo = await achicar(f, 600); $('prLogoT').textContent = 'Logo listo para guardar.'; } catch (err) { toast(traducir(err)); } };
 $('prImg').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { prImg = await achicar(f, 1200); $('prImgT').textContent = 'Imagen lista para guardar.'; } catch (err) { toast(traducir(err)); } };
 $('prForm').onsubmit = async (e) => {
   e.preventDefault(); $('prGuardar').disabled = true;
   try {
     const row = { titulo: $('prTit').value.trim(), texto: $('prTxt').value.trim() || null, etiqueta: $('prEti').value.trim() || null, boton: $('prBot').value.trim() || 'Ver productos',
-      busqueda: $('prBus').value.trim(), desde: $('prDes').value || null, hasta: $('prHas').value || null, orden: +$('prOrd').value || 1, activo: $('prAct').checked, actualizado: new Date().toISOString() };
+      busqueda: $('prBus').value.trim(), desde: $('prDes').value || null, hasta: $('prHas').value || null, orden: +$('prOrd').value || 1, activo: $('prAct').checked, tema: $('prTema').value, actualizado: new Date().toISOString() };
     if (prImg) row.imagen_url = await Guardar.foto('promo-' + slug(row.titulo), prImg);
+    if (prLogo) row.logo_url = await Guardar.foto('promo-logo-' + slug(row.titulo), prLogo);
     const q = prEd ? sb.from('catalogo_promos').update(row).eq('id', prEd.id) : sb.from('catalogo_promos').insert(row);
     const { error } = await q; if (error) throw error;
     toast('Promoción guardada. Los clientes la ven al recargar la página.'); $('prForm').hidden = true; prEd = null; await leerPromosAdm();
